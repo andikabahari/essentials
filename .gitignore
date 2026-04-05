@@ -1,0 +1,4 @@
+base.*
+!base.h
+example.*
+!example.cpp
