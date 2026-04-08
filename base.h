@@ -148,10 +148,12 @@ STATIC_ASSERT(sizeof(u64) == 8, "u64 size incorrect");
 
 // Memory
 
-void *mem_alloc(isize size);
-void *mem_realloc(void *ptr, isize new_size);
-void *mem_copy(void *dest, const void *src, isize num_bytes);
-void mem_free(void *ptr);
+inline void *mem_alloc(isize size);
+inline void *mem_realloc(void *ptr, isize new_size);
+inline void *mem_copy(void *dest, const void *src, isize num_bytes);
+inline void mem_free(void *ptr);
+inline void mem_set(void *dest, i32 ch, isize count);
+inline i32  mem_compare(const void *a, const void *b, isize n);
 
 isize mem_page_size();
 isize mem_granularity();
@@ -256,6 +258,102 @@ void array_ordered_remove(Array<T> *arr, isize index);
 template <typename T>
 void array_unordered_remove(Array<T> *arr, isize index);
 
+// Strings
+
+/*
+
+Notes:
+    String -> non-owning view
+    String_Buffer -> owning, mutable
+    Slice / view -> no alloc
+    Concat / join -> alloc in arena
+    Split -> alloc array + substring (views or copies)
+    String doesn't store null character
+
+*/
+
+struct String {
+    u8 *data;
+    isize len;
+
+    u8 &operator[](isize index) {
+        ASSERT(0 <= index && index < len);
+        return data[index];
+    }
+
+    const u8 &operator[](isize index) const {
+        ASSERT(0 <= index && index < len);
+        return data[index];
+    }
+};
+
+// Example: String s = LIT("Hello!");
+#define LIT(s) String{(u8 *)(s), sizeof(s)-1}
+
+// Example: printf("%.*s\n", FMT(s));
+#define FMT(s) (int)(s).len, (const char *)(s).data
+
+inline String string_from_cstring(const char *cstr);
+inline const char *string_to_cstring(Arena *arena, const String &s);
+
+inline bool string_eq(const String &a, const String &b);
+inline bool string_ne(const String &a, const String &b);
+inline bool string_lt(const String &a, const String &b);
+inline bool string_gt(const String &a, const String &b);
+inline bool string_le(const String &a, const String &b);
+inline bool string_ge(const String &a, const String &b);
+
+inline bool operator == (const String &a, const String &b);
+inline bool operator != (const String &a, const String &b);
+inline bool operator <  (const String &a, const String &b);
+inline bool operator >  (const String &a, const String &b);
+inline bool operator <= (const String &a, const String &b);
+inline bool operator >= (const String &a, const String &b);
+
+template <isize N> inline bool operator == (const String &a, const char (&b)[N]);
+template <isize N> inline bool operator != (const String &a, const char (&b)[N]);
+template <isize N> inline bool operator <  (const String &a, const char (&b)[N]);
+template <isize N> inline bool operator >  (const String &a, const char (&b)[N]);
+template <isize N> inline bool operator <= (const String &a, const char (&b)[N]);
+template <isize N> inline bool operator >= (const String &a, const char (&b)[N]);
+
+template <> inline bool operator == (const String &a, const char (&b)[1]);
+template <> inline bool operator != (const String &a, const char (&b)[1]);
+
+// Utils
+inline u8 to_lower(u8 c);
+inline u8 to_upper(u8 c);
+inline bool is_space(u8 c);
+inline bool byte_in_set(u8 c, const String &strset);
+
+// Non-allocating
+i32 string_compare(const String &a, const String &b);
+bool string_contains(const String &s, const String &substr);
+bool string_contains_byte(const String &s, u8 c);
+String string_cut_prefix(const String &s, const String &prefix);
+String string_cut_suffix(const String &s, const String &suffix);
+bool string_has_prefix(const String &s, const String &prefix);
+bool string_has_suffix(const String &s, const String &suffix);
+isize string_index(const String &s, const String &substr);
+isize string_index_byte(const String &s, u8 c);
+isize string_last_index(const String &s, const String &substr);
+isize string_last_index_byte(const String &s, u8 c);
+String string_trim(const String &s, const String &cutset);
+String string_trim_left(const String &s, const String &cutset);
+String string_trim_right(const String &s, const String &cutset);
+String string_trim_space(const String &s);
+String string_trim_prefix(const String &s, const String &prefix);
+String string_trim_suffix(const String &s, const String &suffix);
+
+// Allocation-based
+String string_to_lower(Arena *arena, const String &s);
+String string_to_upper(Arena *arena, const String &s);
+String string_clone(Arena *arena, const String &s);
+String string_concat(Arena *arena, const String &a, const String &b);
+String string_join(Arena *arena, const Array<String> &elems, const String &sep);
+Array<String> string_split(Arena *arena, const String &s, const String &sep);
+String string_replace(Arena *arena, const String &s, const String &oldstr, const String &newstr);
+
 //
 // DEFINITION
 //
@@ -268,23 +366,31 @@ void array_unordered_remove(Array<T> *arr, isize index);
 
 // Memory
 
-#ifdef BASE_IMPLEMENTATION
-
-void *mem_alloc(isize size) {
+inline void *mem_alloc(isize size) {
     return malloc(size);
 }
 
-void *mem_realloc(void *ptr, isize new_size) {
+inline void *mem_realloc(void *ptr, isize new_size) {
     return realloc(ptr, new_size);
 }
 
-void *mem_copy(void *dest, const void *src, isize num_bytes) {
+inline void *mem_copy(void *dest, const void *src, isize num_bytes) {
     return memcpy(dest, src, num_bytes);
 }
 
-void mem_free(void *ptr) {
+inline void mem_free(void *ptr) {
     free(ptr);
 }
+
+inline void mem_set(void *dest, i32 ch, isize count) {
+    memset(dest, ch, count);
+}
+
+inline i32 mem_compare(const void *a, const void *b, isize n) {
+    return memcmp(a, b, n);
+}
+
+#ifdef BASE_IMPLEMENTATION
 
 #if OS_WINDOWS
 
@@ -380,7 +486,7 @@ void *arena_push(Arena *a, isize size, bool non_zero) {
     a->pos = new_pos;
 
     u8 *out = (u8 *)a + pos_aligned;
-    if (!non_zero) memset(out, 0, size);
+    if (!non_zero) mem_set(out, 0, size);
     return out;
 }
 
@@ -582,5 +688,331 @@ void array_unordered_remove(Array<T> *arr, isize index) {
     arr->data[index] = arr->data[arr->len - 1];
     arr->len -= 1;
 }
+
+// Strings
+
+inline String string_from_cstr(const char *cstr) {
+    return String{(u8 *)cstr, (isize)strlen(cstr)};
+}
+
+inline const char *string_to_cstr(Arena *arena, const String &s) {
+    char *buf = (char *)arena_push(arena, s.len + 1, false);
+    mem_copy(buf, s.data, s.len);
+    buf[s.len] = 0;
+    return buf;
+}
+
+inline bool string_eq(const String &a, const String &b) { return a.len == b.len && mem_compare(a.data, b.data, a.len) == 0; }
+inline bool string_ne(const String &a, const String &b) { return !string_eq(a,b); }
+inline bool string_lt(const String &a, const String &b) { return string_compare(a,b) < 0; }
+inline bool string_gt(const String &a, const String &b) { return string_compare(a,b) > 0; }
+inline bool string_le(const String &a, const String &b) { return string_compare(a,b) <= 0; }
+inline bool string_ge(const String &a, const String &b) { return string_compare(a,b) >= 0; }
+
+inline bool operator == (const String &a, const String &b) { return string_eq(a,b); }
+inline bool operator != (const String &a, const String &b) { return string_ne(a,b); }
+inline bool operator <  (const String &a, const String &b) { return string_lt(a,b); }
+inline bool operator >  (const String &a, const String &b) { return string_gt(a,b); }
+inline bool operator <= (const String &a, const String &b) { return string_le(a,b); }
+inline bool operator >= (const String &a, const String &b) { return string_ge(a,b); }
+
+template <isize N> inline bool operator == (const String &a, const char (&b)[N]) { return string_eq(a, String{(u8 *)b, N-1}); }
+template <isize N> inline bool operator != (const String &a, const char (&b)[N]) { return string_ne(a, String{(u8 *)b, N-1}); }
+template <isize N> inline bool operator <  (const String &a, const char (&b)[N]) { return string_lt(a, String{(u8 *)b, N-1}); }
+template <isize N> inline bool operator >  (const String &a, const char (&b)[N]) { return string_gt(a, String{(u8 *)b, N-1}); }
+template <isize N> inline bool operator <= (const String &a, const char (&b)[N]) { return string_le(a, String{(u8 *)b, N-1}); }
+template <isize N> inline bool operator >= (const String &a, const char (&b)[N]) { return string_ge(a, String{(u8 *)b, N-1}); }
+
+template <> inline bool operator == (const String &a, const char (&b)[1]) { return a.len == 0; }
+template <> inline bool operator != (const String &a, const char (&b)[1]) { return a.len != 0; }
+
+inline u8 to_lower(u8 c) {
+    if (c >= 'A' && c <= 'Z') return c + 32;
+    return c;
+}
+
+inline u8 to_upper(u8 c) {
+    if (c >= 'a' && c <= 'z') return c - 32;
+    return c;
+}
+
+inline bool is_space(u8 c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+inline bool byte_in_set(u8 c, const String &strset) {
+    for (isize i = 0; i < strset.len; i++) {
+        if (strset.data[i] == c) return true;
+    }
+    return false;
+}
+
+#ifdef BASE_IMPLEMENTATION
+
+i32 string_compare(const String &a, const String &b) {
+    isize n = MIN(a.len, b.len);
+
+    i32 cmp = mem_compare(a.data, b.data, n);
+    if (cmp != 0) return cmp;
+
+    if (a.len < b.len) return -1;
+    if (a.len > b.len) return 1;
+    return 0;
+}
+
+bool string_contains(const String &s, const String &sub) {
+    return string_index(s, sub) >= 0;
+}
+
+bool string_contains_byte(const String &s, u8 c) {
+    return string_index_byte(s, c) >= 0;
+}
+
+String string_cut_prefix(const String &s, const String &prefix) {
+    if (string_has_prefix(s, prefix)) {
+        return String{ s.data + prefix.len, s.len - prefix.len };
+    }
+    return s;
+}
+
+String string_cut_suffix(const String &s, const String &suffix) {
+    if (string_has_suffix(s, suffix)) {
+        return String{ s.data, s.len - suffix.len };
+    }
+    return s;
+}
+
+bool string_has_prefix(const String &s, const String &prefix) {
+    if (prefix.len > s.len) return false;
+    return mem_compare(s.data, prefix.data, prefix.len) == 0;
+}
+
+bool string_has_suffix(const String &s, const String &suffix) {
+    if (suffix.len > s.len) return false;
+    return mem_compare(s.data + (s.len - suffix.len), suffix.data, suffix.len) == 0;
+}
+
+isize string_index(const String &s, const String &sub) {
+    if (sub.len == 0) return 0;
+    if (sub.len > s.len) return -1;
+
+    for (isize i = 0; i <= s.len - sub.len; i++) {
+        if (mem_compare(s.data + i, sub.data, sub.len) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+isize string_index_byte(const String &s, u8 c) {
+    for (isize i = 0; i < s.len; i++) {
+        if (s.data[i] == c) return i;
+    }
+    return -1;
+}
+
+isize string_last_index(const String &s, const String &sub) {
+    if (sub.len == 0) return s.len;
+    if (sub.len > s.len) return -1;
+
+    for (isize i = s.len - sub.len; i >= 0; i--) {
+        if (mem_compare(s.data + i, sub.data, sub.len) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+isize string_last_index_byte(const String &s, u8 c) {
+    for (isize i = s.len - 1; i >= 0; i--) {
+        if (s.data[i] == c) return i;
+    }
+    return -1;
+}
+
+String string_trim_left(const String &s, const String &cutset) {
+    isize i = 0;
+    while (i < s.len && byte_in_set(s.data[i], cutset)) i++;
+    return String{ s.data + i, s.len - i };
+}
+
+String string_trim_right(const String &s, const String &cutset) {
+    isize end = s.len;
+    while (end > 0 && byte_in_set(s.data[end - 1], cutset)) end--;
+    return String{ s.data, end };
+}
+
+String string_trim_space(const String &s) {
+    isize start = 0;
+    while (start < s.len && is_space(s.data[start])) start++;
+
+    isize end = s.len;
+    while (end > start && is_space(s.data[end - 1])) end--;
+
+    return String{ s.data + start, end - start };
+}
+
+String string_trim(const String &s, const String &cutset) {
+    return string_trim_right(string_trim_left(s, cutset), cutset);
+}
+
+String string_trim_prefix(const String &s, const String &prefix) {
+    if (string_has_prefix(s, prefix)) {
+        return String{ s.data + prefix.len, s.len - prefix.len };
+    }
+    return s;
+}
+
+String string_trim_suffix(const String &s, const String &suffix) {
+    if (string_has_suffix(s, suffix)) {
+        return String{ s.data, s.len - suffix.len };
+    }
+    return s;
+}
+
+String string_to_lower(Arena *arena, const String &s) {
+    u8 *data = PUSH_ARRAY(arena, u8, s.len);
+    for (isize i = 0; i < s.len; i++) data[i] = to_lower(s.data[i]);
+    return String{ data, s.len };
+}
+
+String string_to_upper(Arena *arena, const String &s) {
+    u8 *data = PUSH_ARRAY(arena, u8, s.len);
+    for (isize i = 0; i < s.len; i++) data[i] = to_upper(s.data[i]);
+    return String{ data, s.len };
+}
+
+String string_clone(Arena *arena, const String &s) {
+    u8 *data = PUSH_ARRAY(arena, u8, s.len);
+    mem_copy(data, s.data, s.len);
+    return String{ data, s.len };
+}
+
+String string_concat(Arena *arena, const String &a, const String &b) {
+    isize len = a.len + b.len;
+    u8 *data = PUSH_ARRAY(arena, u8, len);
+
+    mem_copy(data, a.data, a.len);
+    mem_copy(data + a.len, b.data, b.len);
+
+    return String{ data, len };
+}
+
+String string_join(Arena *arena, const Array<String> &elems, const String &sep) {
+    if (elems.len == 0) return String{0,0};
+
+    // compute total length
+    isize total = 0;
+    for (isize i = 0; i < elems.len; i++) {
+        total += elems[i].len;
+    }
+    total += sep.len * (elems.len - 1);
+
+    u8 *data = PUSH_ARRAY(arena, u8, total);
+
+    isize pos = 0;
+
+    for (isize i = 0; i < elems.len; i++) {
+        // copy element
+        mem_copy(data + pos, elems[i].data, elems[i].len);
+        pos += elems[i].len;
+
+        // copy separator
+        if (i != elems.len - 1) {
+            mem_copy(data + pos, sep.data, sep.len);
+            pos += sep.len;
+        }
+    }
+
+    return String{ data, total };
+}
+
+Array<String> string_split(Arena *arena, const String &s, const String &sep) {
+    Array<String> result;
+    array_init(&result, arena);
+
+    if (sep.len == 0) {
+        // split into bytes
+        for (isize i = 0; i < s.len; i++) {
+            array_add(&result, String{ s.data + i, 1 });
+        }
+        return result;
+    }
+
+    isize start = 0;
+
+    while (start <= s.len) {
+        isize idx = string_index(
+            String{ s.data + start, s.len - start }, sep
+        );
+
+        if (idx < 0) {
+            // last segment
+            array_add(&result, String{
+                s.data + start,
+                s.len - start
+            });
+            break;
+        }
+
+        array_add(&result, String{
+            s.data + start,
+            idx
+        });
+
+        start += idx + sep.len;
+    }
+
+    return result;
+}
+
+String string_replace(
+        Arena *arena,
+        const String &s,
+        const String &oldstr,
+        const String &newstr) {
+    if (oldstr.len == 0) return s;
+
+    // count occurrences
+    isize count = 0;
+    isize pos = 0;
+
+    while (pos <= s.len - oldstr.len) {
+        if (mem_compare(s.data + pos, oldstr.data, oldstr.len) == 0) {
+            count++;
+            pos += oldstr.len;
+        } else {
+            pos++;
+        }
+    }
+
+    if (count == 0) return s;
+
+    isize new_len =
+        s.len +
+        count * (newstr.len - oldstr.len);
+
+    u8 *data = PUSH_ARRAY(arena, u8, new_len);
+
+    isize src = 0;
+    isize dst = 0;
+
+    while (src < s.len) {
+        if (src <= s.len - oldstr.len &&
+            mem_compare(s.data + src, oldstr.data, oldstr.len) == 0) {
+
+            mem_copy(data + dst, newstr.data, newstr.len);
+            dst += newstr.len;
+            src += oldstr.len;
+
+        } else {
+            data[dst++] = s.data[src++];
+        }
+    }
+
+    return String{ data, new_len };
+}
+
+#endif // BASE_IMPLEMENTATION
 
 #endif // BASE_H

@@ -1,4 +1,5 @@
 @echo off
+@setlocal
 
 :: Default
 
@@ -37,16 +38,19 @@ if %opt_debug%==1 (
 
 if %opt_impl%==1 (
     echo Compiling base implementation...
-    cl /c /TP %cflags% base.h /DBASE_IMPLEMENTATION /nologo
+    call cl /c /TP %cflags% base.h /DBASE_IMPLEMENTATION /nologo
     set base_obj=base.obj
 ) else (
     set base_obj=
+    set cflags=/DBASE_IMPLEMENTATION
 )
 
 :: Test!
 
 echo Building tests...
 call cl %cflags% tests.cpp %base_obj% %lflags% /nologo
-tests.exe
+call tests.exe
 
 echo Done.
+
+@endlocal
