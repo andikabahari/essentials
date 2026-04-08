@@ -1,8 +1,28 @@
 #ifndef BASE_H
+#define BASE_H
+
+/*
+
+Critical rules:
+   1. Templates
+      - Always in header
+      - Never inside `#ifdef BASE_IMPLEMENTATION`
+   2. Non-template functions
+      - Declaration in header
+      - Definition ONLY inside `#ifdef BASE_IMPLEMENTATION`
+   3. Exactly ONE implementation:
+      - One C/C++ file with `#define BASE_IMPLEMENTATION`
+      - OR compile this file into `.lib`
+
+*/
 
 //
 // DECLARATION
 //
+
+#define local_persist static
+#define internal static
+#define global_var static
 
 // Compiler detection
 
@@ -128,15 +148,17 @@ STATIC_ASSERT(sizeof(u64) == 8, "u64 size incorrect");
 
 // Memory
 
-void *mem_alloc(u64 size);
+void *mem_alloc(isize size);
+void *mem_realloc(void *ptr, isize new_size);
+void *mem_copy(void *dest, const void *src, isize num_bytes);
 void mem_free(void *ptr);
 
-u32 mem_page_size();
-u32 mem_granularity();
+isize mem_page_size();
+isize mem_granularity();
 
-void *mem_reserve(u64 size);
-bool mem_commit(void *ptr, u64 size);
-bool mem_decommit(void *ptr, u64 size);
+void *mem_reserve(isize size);
+bool mem_commit(void *ptr, isize size);
+bool mem_decommit(void *ptr, isize size);
 bool mem_release(void *ptr);
 
 // Arena
@@ -145,17 +167,17 @@ bool mem_release(void *ptr);
 #define ARENA_ALIGN (sizeof(void *))
 
 struct Arena {
-    u64 reserve_size;
-    u64 commit_size;
-    u64 pos;
-    u64 commit_pos;
+    isize reserve_size;
+    isize commit_size;
+    isize pos;
+    isize commit_pos;
 };
 
-Arena *arena_create(u64 reserve_size, u64 commit_size);
-void arena_free(Arena *a);
-void *arena_push(Arena *a, u64 size, bool non_zero);
-void arena_pop(Arena *a, u64 size);
-void arena_pop_to(Arena *a, u64 pos);
+Arena *arena_create(isize reserve_size, isize commit_size);
+void arena_destroy(Arena *a);
+void *arena_push(Arena *a, isize size, bool non_zero);
+void arena_pop(Arena *a, isize size);
+void arena_pop_to(Arena *a, isize pos);
 void arena_clear(Arena *a);
 
 #define PUSH_STRUCT(a, T) (T *)arena_push((a), sizeof(T), false)
@@ -165,20 +187,78 @@ void arena_clear(Arena *a);
 
 struct Temp_Arena {
     Arena *arena;
-    u64 start_pos;
+    isize start_pos;
 };
 
-Temp_Arena temp_arena_begin(Arena *a);
-void temp_arena_end(Temp_Arena temp);
+Temp_Arena begin_temp_arena(Arena *a);
+void end_temp_arena(Temp_Arena temp);
 
-Temp_Arena scratch_arena_get(Arena **conflicts, u32 num_conflicts);
-void scratch_arena_release(Temp_Arena scratch);
+#define SCRATCH_POOL 2
+#define SCRATCH_RESERVE_SIZE (MiB(64))
+#define SCRATCH_COMMIT_SIZE (MiB(1))
+
+extern THREAD_LOCAL Arena *scratch_pool[SCRATCH_POOL];
+
+Temp_Arena get_scratch_arena(Arena **conflicts, i32 num_conflicts);
+void release_scratch_arena(Temp_Arena scratch);
+
+// Arrays
+
+template <typename T>
+struct Array {
+    T *data;
+    isize len;
+    isize cap;
+
+    Arena *arena;
+
+    T &operator[](isize index) {
+        ASSERT(index < len);
+        return data[index];
+    }
+
+    const T &operator[](isize index) const {
+        ASSERT(index < len);
+        return data[index];
+    }
+};
+
+template <typename T>
+internal void array_grow(Array<T> *arr, isize min_cap);
+
+template <typename T>
+internal bool array_can_grow_in_place(Array<T> *arr);
+
+template <typename T>
+void array_init(Array<T> *arr, isize initial_cap = 0);
+
+template <typename T>
+void array_init(Array<T> *arr, Arena *arena, isize initial_cap = 0);
+
+template <typename T>
+void array_free(Array<T> *arr);
+
+template <typename T>
+void array_reserve(Array<T> *arr, isize new_cap);
+
+template <typename T>
+void array_add(Array<T> *arr, const T &value);
+
+template <typename T>
+T array_pop(Array<T> *arr);
+
+template <typename T>
+void array_clear(Array<T> *arr);
+
+template <typename T>
+void array_ordered_remove(Array<T> *arr, isize index);
+
+template <typename T>
+void array_unordered_remove(Array<T> *arr, isize index);
 
 //
-// IMPLEMENTATION
+// DEFINITION
 //
-
-#ifdef BASE_IMPLEMENTATION
 
 #include <stdlib.h>
 
@@ -188,8 +268,18 @@ void scratch_arena_release(Temp_Arena scratch);
 
 // Memory
 
-void *mem_alloc(u64 size) {
+#ifdef BASE_IMPLEMENTATION
+
+void *mem_alloc(isize size) {
     return malloc(size);
+}
+
+void *mem_realloc(void *ptr, isize new_size) {
+    return realloc(ptr, new_size);
+}
+
+void *mem_copy(void *dest, const void *src, isize num_bytes) {
+    return memcpy(dest, src, num_bytes);
 }
 
 void mem_free(void *ptr) {
@@ -198,8 +288,8 @@ void mem_free(void *ptr) {
 
 #if OS_WINDOWS
 
-u32 mem_page_size() {
-    static u32 result = 0;
+isize mem_page_size() {
+    local_persist isize result = 0;
     if (result == 0) {
         SYSTEM_INFO sysinfo = {};
         GetSystemInfo(&sysinfo);
@@ -208,8 +298,8 @@ u32 mem_page_size() {
     return result;
 }
 
-u32 mem_granularity() {
-    static u32 result = 0;
+isize mem_granularity() {
+    local_persist isize result = 0;
     if (result == 0) {
         SYSTEM_INFO sysinfo = {};
         GetSystemInfo(&sysinfo);
@@ -218,12 +308,12 @@ u32 mem_granularity() {
     return result;
 }
 
-void *mem_reserve(u64 size) {
+void *mem_reserve(isize size) {
     size = ALIGN_UP(size, mem_page_size());
     return VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
 }
 
-bool mem_commit(void *ptr, u64 size) {
+bool mem_commit(void *ptr, isize size) {
     ASSERT(ptr);
     size = ALIGN_UP(size, mem_page_size());
     void *ret = VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE);
@@ -231,9 +321,9 @@ bool mem_commit(void *ptr, u64 size) {
     return ret != NULL;
 }
 
-bool mem_decommit(void *ptr, u64 size) {
+bool mem_decommit(void *ptr, isize size) {
     ASSERT(ptr);
-    size = ALIGN_UP(size, mem_page_size());
+    size = ALIGN_UP(size, (isize)mem_page_size());
     return VirtualFree(ptr, size, MEM_DECOMMIT) != 0;
 }
 
@@ -244,11 +334,15 @@ bool mem_release(void *ptr) {
 
 #endif
 
+#endif // BASE_IMPLEMENTATION
+
 // Arena
 
-Arena *arena_create(u64 reserve_size, u64 commit_size) {
-    u32 page_size = mem_page_size();
-    u32 gran = mem_granularity();
+#ifdef BASE_IMPLEMENTATION
+
+Arena *arena_create(isize reserve_size, isize commit_size) {
+    isize page_size = mem_page_size();
+    isize gran = mem_granularity();
     reserve_size = ALIGN_UP(reserve_size, gran);
     commit_size = ALIGN_UP(commit_size, page_size);
     Arena *a = (Arena *)mem_reserve(reserve_size);
@@ -260,24 +354,24 @@ Arena *arena_create(u64 reserve_size, u64 commit_size) {
     return a;
 }
 
-void arena_free(Arena *a) {
+void arena_destroy(Arena *a) {
     mem_release(a);
 }
 
-void *arena_push(Arena *a, u64 size, bool non_zero) {
-    u64 pos_aligned = ALIGN_UP(a->pos, ARENA_ALIGN);
-    u64 new_pos = pos_aligned + size;
+void *arena_push(Arena *a, isize size, bool non_zero) {
+    isize pos_aligned = ALIGN_UP(a->pos, ARENA_ALIGN);
+    isize new_pos = pos_aligned + size;
 
     if (new_pos > a->reserve_size) return NULL;
 
     if (new_pos > a->commit_pos) {
-        u64 new_commit_pos = new_pos;
+        isize new_commit_pos = new_pos;
         new_commit_pos += a->commit_size - 1;
         new_commit_pos -= new_commit_pos % a->commit_size;
         new_commit_pos = MIN(new_commit_pos, a->reserve_size);
 
         u8 *mem = (u8 *)a + a->commit_pos;
-        u64 commit_size = new_commit_pos - a->commit_pos;
+        isize commit_size = new_commit_pos - a->commit_pos;
         if (!mem_commit(mem, commit_size)) return NULL;
 
         a->commit_pos = new_commit_pos;
@@ -290,13 +384,13 @@ void *arena_push(Arena *a, u64 size, bool non_zero) {
     return out;
 }
 
-void arena_pop(Arena *a, u64 size) {
+void arena_pop(Arena *a, isize size) {
     size = MIN(size, a->pos - ARENA_BASE_POS);
     a->pos -= size;
 }
 
-void arena_pop_to(Arena *a, u64 pos) {
-    u64 size = pos < a->pos ? a->pos - pos : 0;
+void arena_pop_to(Arena *a, isize pos) {
+    isize size = pos < a->pos ? a->pos - pos : 0;
     arena_pop(a, size);
 }
 
@@ -304,30 +398,26 @@ void arena_clear(Arena *a) {
     arena_pop_to(a, ARENA_BASE_POS);
 }
 
-Temp_Arena temp_arena_begin(Arena *a) {
+Temp_Arena begin_temp_arena(Arena *a) {
     Temp_Arena temp = {};
     temp.arena = a;
     temp.start_pos = a->pos;
     return temp;
 }
 
-void temp_arena_end(Temp_Arena temp) {
+void end_temp_arena(Temp_Arena temp) {
     arena_pop_to(temp.arena, temp.start_pos);
 }
 
-#define SCRATCH_POOL 2
-#define SCRATCH_RESERVE_SIZE (MiB(64))
-#define SCRATCH_COMMIT_SIZE (MiB(1))
+THREAD_LOCAL Arena *scratch_pool[SCRATCH_POOL] = { NULL, NULL };
 
-THREAD_LOCAL static Arena *scratch_pool[SCRATCH_POOL] = { NULL, NULL };
+Temp_Arena get_scratch_arena(Arena **conflicts, i32 num_conflicts) {
+    isize scratch_index = -1;
 
-Temp_Arena scratch_arena_get(Arena **conflicts, u32 num_conflicts) {
-    i32 scratch_index = -1;
-
-    for (i32 i = 0; i < SCRATCH_POOL; i++) {
+    for (isize i = 0; i < SCRATCH_POOL; i++) {
         bool found = false;
 
-        for (u32 j = 0; j < num_conflicts; j++) {
+        for (isize j = 0; j < num_conflicts; j++) {
             if (scratch_pool[i] == conflicts[j]) {
                 found = true;
                 break;
@@ -351,13 +441,146 @@ Temp_Arena scratch_arena_get(Arena **conflicts, u32 num_conflicts) {
         *selected = arena_create(SCRATCH_RESERVE_SIZE, SCRATCH_COMMIT_SIZE);
         ASSERT(*selected);
     }
-    return temp_arena_begin(*selected);
+    return begin_temp_arena(*selected);
 }
 
-void scratch_arena_release(Temp_Arena scratch) {
-    temp_arena_end(scratch);
+void release_scratch_arena(Temp_Arena scratch) {
+    end_temp_arena(scratch);
 }
 
 #endif // BASE_IMPLEMENTATION
+
+// Arrays
+
+template <typename T>
+internal bool array_can_grow_in_place(Array<T> *arr) {
+    if (!arr->data) return false;
+
+    u8 *end = (u8 *)arr->data + sizeof(T) * arr->cap;
+    u8 *arena_top = (u8 *)arr->arena + arr->arena->pos;
+
+    return end == arena_top;
+}
+
+template <typename T>
+internal void array_grow(Array<T> *arr, isize cap_wanted) {
+    isize new_cap = arr->cap > 0 ? arr->cap * 2 : 8;
+    if (new_cap < cap_wanted) new_cap = cap_wanted;
+    array_reserve(arr, new_cap);
+}
+
+template <typename T>
+void array_init(Array<T> *arr, Arena *arena, isize initial_cap) {
+    arr->data = NULL;
+    arr->len = 0;
+    arr->cap = 0;
+    arr->arena = arena;
+
+    if (initial_cap > 0) {
+        if (arr->arena != NULL) {
+            arr->data = PUSH_ARRAY(arena, T, initial_cap);
+        } else {
+            isize size = sizeof(T) * initial_cap;
+            arr->data = (T *)mem_alloc(size);
+        }
+        ASSERT(arr->data != NULL);
+        arr->cap = initial_cap;
+    }
+}
+
+template <typename T>
+void array_init(Array<T> *arr, isize initial_cap) {
+    array_init(arr, NULL, initial_cap);
+}
+
+template <typename T>
+void array_free(Array<T> *arr) {
+    if (arr->data && !arr->arena) {
+        mem_free(arr->data);
+    }
+
+    arr->data = NULL;
+    arr->len = 0;
+    arr->cap = 0;
+    arr->arena = NULL;
+}
+
+template <typename T>
+void array_reserve(Array<T> *arr, isize new_cap) {
+    if (new_cap <= arr->cap) return;
+
+    if (arr->arena) {
+        if (array_can_grow_in_place(arr)) {
+            isize extra = new_cap - arr->cap;
+            void *ptr = (void *)PUSH_ARRAY(arr->arena, T, extra);
+            ASSERT(ptr != NULL);
+            arr->cap = new_cap;
+        } else { // fallback: alloc + copy
+            T *new_data = PUSH_ARRAY(arr->arena, T, new_cap);
+            ASSERT(new_data != NULL);
+
+            if (arr->data) {
+                mem_copy(new_data, arr->data, sizeof(T) * arr->len);
+            }
+
+            arr->data = new_data;
+            arr->cap = new_cap;
+        }
+    } else {
+        isize new_size = new_cap * sizeof(T);
+
+        if (arr->data) {
+            void *ptr = mem_realloc(arr->data, new_size);
+            ASSERT(ptr != NULL);
+            arr->data = (T *)ptr;
+        } else {
+            arr->data = (T *)mem_alloc(new_size);
+            ASSERT(arr->data != NULL);
+        }
+
+        arr->cap = new_cap;
+    }
+}
+
+template <typename T>
+void array_add(Array<T> *arr, const T &value) {
+    if (arr->len >= arr->cap) {
+        array_grow(arr, arr->len + 1);
+    }
+    arr->data[arr->len] = value;
+    arr->len += 1;
+}
+
+template <typename T>
+T array_pop(Array<T> *arr) {
+    ASSERT(arr->len > 0);
+
+    arr->len -= 1;
+    return arr->data[arr->len];
+}
+
+template <typename T>
+void array_clear(Array<T> *arr) {
+    arr->len = 0;
+}
+
+template <typename T>
+void array_ordered_remove(Array<T> *arr, isize index) {
+    ASSERT(index < arr->len);
+
+    for (isize i = index; i < arr->len - 1; i++) {
+        arr->data[i] = arr->data[i + 1];
+    }
+
+    arr->len -= 1;
+}
+
+template <typename T>
+void array_unordered_remove(Array<T> *arr, isize index) {
+    ASSERT(index < arr->len);
+
+    arr->data[index] = arr->data[arr->len - 1];
+    arr->len -= 1;
+}
 
 #endif // BASE_H

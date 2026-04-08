@@ -2,3 +2,8 @@ base.*
 !base.h
 example.*
 !example.cpp
+example2.*
+!example2.cpp
+!example2.h
+*.pdb
+*.rdi
