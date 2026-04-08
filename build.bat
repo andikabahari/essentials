@@ -37,15 +37,16 @@ if %opt_debug%==1 (
 
 if %opt_impl%==1 (
     echo Compiling base implementation...
-    cl /c %cflags% base.h /DBASE_IMPLEMENTATION
+    cl /c /TP %cflags% base.h /DBASE_IMPLEMENTATION /nologo
     set base_obj=base.obj
 ) else (
     set base_obj=
 )
 
-:: Build examples
+:: Test!
 
-echo Building examples...
-cl %cflags% example.cpp example2.cpp %base_obj% %lflags%
+echo Building tests...
+call cl %cflags% tests.cpp %base_obj% %lflags% /nologo
+tests.exe
 
 echo Done.

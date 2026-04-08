@@ -323,7 +323,7 @@ bool mem_commit(void *ptr, isize size) {
 
 bool mem_decommit(void *ptr, isize size) {
     ASSERT(ptr);
-    size = ALIGN_UP(size, (isize)mem_page_size());
+    size = ALIGN_UP(size, mem_page_size());
     return VirtualFree(ptr, size, MEM_DECOMMIT) != 0;
 }
 
@@ -417,7 +417,7 @@ Temp_Arena get_scratch_arena(Arena **conflicts, i32 num_conflicts) {
     for (isize i = 0; i < SCRATCH_POOL; i++) {
         bool found = false;
 
-        for (isize j = 0; j < num_conflicts; j++) {
+        for (i32 j = 0; j < num_conflicts; j++) {
             if (scratch_pool[i] == conflicts[j]) {
                 found = true;
                 break;
