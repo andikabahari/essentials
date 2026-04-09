@@ -1,3 +1,6 @@
+#ifndef BASE_COMPILED
+#define BASE_IMPLEMENTATION
+#endif
 #include "base.h"
 
 #define TEST(name) void name()

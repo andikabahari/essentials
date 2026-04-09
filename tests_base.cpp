@@ -36,7 +36,7 @@ TEST(test_array_growth) {
     Arena *arena = make_arena();
 
     Array<int> arr;
-    array_init(&arr, arena, 2);
+    array_init(&arr, 0, 2, arena);
 
     array_add(&arr, 1);
     array_add(&arr, 2);

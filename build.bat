@@ -11,13 +11,8 @@ set opt_debug=0
 :parse
 if "%1"=="" goto done_parse
 
-if /I "%1"=="impl" (
-    set opt_impl=1
-)
-
-if /I "%1"=="debug" (
-    set opt_debug=1
-)
+if /I "%1"=="impl"  set opt_impl=1
+if /I "%1"=="debug" set opt_debug=1
 
 shift
 goto parse
@@ -26,31 +21,35 @@ goto parse
 
 :: Compiler flags
 
-if %opt_debug%==1 (
-    set cflags=%cflags% /Zi /Od /DDEBUG
-    set lflags=/DEBUG
-) else (
-    set cflags=%cflags% /O2
-    set lflags=
-)
+set cflags=
+if %opt_debug%==1 (set cflags=/Zi /Od /DDEBUG) else (set cflags=/O2)
+if %opt_impl%==1  (set cflags=%cflags% /DBASE_STATIC /DBASE_COMPILED)
 
-:: Build base
+set lflgas=
+if %opt_debug%==1 set lflags=/DEBUG
 
+:: Compile
+
+set cl_base=
+set base_obj=
+if %opt_impl%==1 set cl_base=call cl /c /TP %cflags% /DBASE_IMPLEMENTATION base.h /nologo
 if %opt_impl%==1 (
     echo Compiling base implementation...
-    call cl /c /TP %cflags% base.h /DBASE_IMPLEMENTATION /nologo
+    echo Command: %cl_base%
+    %cl_base%
+    echo.
     set base_obj=base.obj
-) else (
-    set base_obj=
-    set cflags=/DBASE_IMPLEMENTATION
 )
+
+set cl_tests=call cl %cflags% tests.cpp %base_obj% %lflags% /nologo
+echo Compiling tests...
+echo Command: %cl_tests%
+%cl_tests%
+echo.
 
 :: Test!
 
-echo Building tests...
-call cl %cflags% tests.cpp %base_obj% %lflags% /nologo
 call tests.exe
-
 echo Done.
 
 @endlocal
