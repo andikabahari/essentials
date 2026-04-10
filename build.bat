@@ -44,12 +44,13 @@ if %opt_impl%==1 (
 set cl_tests=call cl %cflags% tests.cpp %base_obj% %lflags% /nologo
 echo Compiling tests...
 echo Command: %cl_tests%
+if exist "tests.exe" del tests.exe
 %cl_tests%
 echo.
 
 :: Test!
 
-call tests.exe
+if exist "tests.exe" call tests.exe
 echo Done.
 
 @endlocal

@@ -192,10 +192,10 @@ IDEF void arena_pop(Arena *a, isize size);
 IDEF void arena_pop_to(Arena *a, isize pos);
 IDEF void arena_clear(Arena *a);
 
-#define PUSH_STRUCT(a, T) (T *)arena_push((a), sizeof(T), false)
-#define PUSH_STRUCT_NZ(a, T) (T *)arena_push((a), sizeof(T), true)
-#define PUSH_ARRAY(a, T, n) (T *)arena_push((a), sizeof(T) * (n), false)
-#define PUSH_ARRAY_NZ(a, T, n) (T *)arena_push((a), sizeof(T) * (n), true)
+#define PUSH_ONE(a, T) (T *)arena_push((a), sizeof(T), false)
+#define PUSH_ONE_NZ(a, T) (T *)arena_push((a), sizeof(T), true)
+#define PUSH_MANY(a, T, n) (T *)arena_push((a), sizeof(T) * (n), false)
+#define PUSH_MANY_NZ(a, T, n) (T *)arena_push((a), sizeof(T) * (n), true)
 
 struct Temp_Arena {
     Arena *arena;
@@ -211,7 +211,7 @@ IDEF void end_temp_arena(Temp_Arena temp);
 
 extern THREAD_LOCAL Arena *scratch_pool[SCRATCH_POOL];
 
-IDEF Temp_Arena get_scratch_arena(Arena **conflicts, i32 num_conflicts);
+IDEF Temp_Arena acquire_scratch_arena(Arena **conflicts, i32 num_conflicts);
 IDEF void release_scratch_arena(Temp_Arena scratch);
 
 // Arrays
@@ -464,8 +464,10 @@ IDEF Arena *arena_create(isize reserve_size, isize commit_size) {
     isize gran = mem_granularity();
     reserve_size = ALIGN_UP(reserve_size, gran);
     commit_size = ALIGN_UP(commit_size, page_size);
+
     Arena *a = (Arena *)mem_reserve(reserve_size);
-    if (!mem_commit(a, commit_size)) return NULL; 
+    ASSERT(mem_commit(a, commit_size) == true);
+
     a->reserve_size = reserve_size;
     a->commit_size = commit_size;
     a->pos = ARENA_BASE_POS;
@@ -491,7 +493,7 @@ IDEF void *arena_push(Arena *a, isize size, bool non_zero) {
 
         u8 *mem = (u8 *)a + a->commit_pos;
         isize commit_size = new_commit_pos - a->commit_pos;
-        if (!mem_commit(mem, commit_size)) return NULL;
+        ASSERT(mem_commit(mem, commit_size) == true);
 
         a->commit_pos = new_commit_pos;
     }
@@ -530,7 +532,7 @@ IDEF void end_temp_arena(Temp_Arena temp) {
 
 THREAD_LOCAL Arena *scratch_pool[SCRATCH_POOL] = { NULL, NULL };
 
-IDEF Temp_Arena get_scratch_arena(Arena **conflicts, i32 num_conflicts) {
+IDEF Temp_Arena acquire_scratch_arena(Arena **conflicts, i32 num_conflicts) {
     isize scratch_index = -1;
 
     for (isize i = 0; i < SCRATCH_POOL; i++) {
@@ -601,11 +603,11 @@ void array_init(Array<T> *arr, isize initial_len, isize initial_cap, Arena *aren
 
     if (initial_cap > 0) {
         if (arr->arena != NULL) {
-            arr->data = PUSH_ARRAY(arena, T, initial_cap);
+            arr->data = PUSH_MANY(arena, T, initial_cap);
         } else {
             isize size = sizeof(T) * initial_cap;
             arr->data = (T *)mem_alloc(size);
-            mem_set((u8 *)arr->data, 0, size);
+            mem_set(arr->data, 0, size);
         }
         ASSERT(arr->data != NULL);
         arr->cap = initial_cap;
@@ -642,11 +644,11 @@ void array_reserve(Array<T> *arr, isize new_cap) {
     if (arr->arena) {
         if (array_can_grow_in_place(arr)) {
             isize extra = new_cap - arr->cap;
-            void *ptr = (void *)PUSH_ARRAY(arr->arena, T, extra);
+            void *ptr = (void *)PUSH_MANY(arr->arena, T, extra);
             ASSERT(ptr != NULL);
             arr->cap = new_cap;
         } else { // fallback: alloc + copy
-            T *new_data = PUSH_ARRAY(arr->arena, T, new_cap);
+            T *new_data = PUSH_MANY(arr->arena, T, new_cap);
             ASSERT(new_data != NULL);
 
             if (arr->data) {
@@ -895,26 +897,26 @@ IDEF String string_trim_suffix(const String &s, const String &suffix) {
 }
 
 IDEF String string_to_lower(Arena *arena, const String &s) {
-    u8 *data = PUSH_ARRAY(arena, u8, s.len);
+    u8 *data = PUSH_MANY(arena, u8, s.len);
     for (isize i = 0; i < s.len; i++) data[i] = to_lower(s.data[i]);
     return String{ data, s.len };
 }
 
 IDEF String string_to_upper(Arena *arena, const String &s) {
-    u8 *data = PUSH_ARRAY(arena, u8, s.len);
+    u8 *data = PUSH_MANY(arena, u8, s.len);
     for (isize i = 0; i < s.len; i++) data[i] = to_upper(s.data[i]);
     return String{ data, s.len };
 }
 
 IDEF String string_clone(Arena *arena, const String &s) {
-    u8 *data = PUSH_ARRAY(arena, u8, s.len);
+    u8 *data = PUSH_MANY(arena, u8, s.len);
     mem_copy(data, s.data, s.len);
     return String{ data, s.len };
 }
 
 IDEF String string_concat(Arena *arena, const String &a, const String &b) {
     isize len = a.len + b.len;
-    u8 *data = PUSH_ARRAY(arena, u8, len);
+    u8 *data = PUSH_MANY(arena, u8, len);
 
     mem_copy(data, a.data, a.len);
     mem_copy(data + a.len, b.data, b.len);
@@ -932,7 +934,7 @@ IDEF String string_join(Arena *arena, const Array<String> &elems, const String &
     }
     total += sep.len * (elems.len - 1);
 
-    u8 *data = PUSH_ARRAY(arena, u8, total);
+    u8 *data = PUSH_MANY(arena, u8, total);
 
     isize pos = 0;
 
@@ -1016,7 +1018,7 @@ IDEF String string_replace(
         s.len +
         count * (newstr.len - oldstr.len);
 
-    u8 *data = PUSH_ARRAY(arena, u8, new_len);
+    u8 *data = PUSH_MANY(arena, u8, new_len);
 
     isize src = 0;
     isize dst = 0;

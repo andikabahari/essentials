@@ -1,3 +1,324 @@
+// Arena
+
+TEST(test_arena_push_one) {
+    Arena *a = make_arena();
+
+    int *x = PUSH_ONE(a, int);
+    *x = 42;
+
+    ASSERT(*x == 42);
+
+    arena_destroy(a);
+}
+
+TEST(test_arena_push_many) {
+    Arena *a = make_arena();
+
+    int *arr = PUSH_MANY(a, int, 100);
+
+    for (int i = 0; i < 100; i++) {
+        arr[i] = i;
+    }
+
+    for (int i = 0; i < 100; i++) {
+        ASSERT(arr[i] == i);
+    }
+
+    arena_destroy(a);
+}
+
+TEST(test_arena_zero_flag) {
+    Arena *a = make_arena();
+
+    int *x = (int *)arena_push(a, sizeof(int), false);
+    *x = 123;
+
+    arena_pop(a, sizeof(int));
+
+    int *y = (int *)arena_push(a, sizeof(int), true);
+
+    // Not guaranteed to be zero, but often reused
+    // So we just ensure it's writable
+    *y = 456;
+
+    ASSERT(*y == 456);
+
+    arena_destroy(a);
+}
+
+TEST(test_arena_pop) {
+    Arena *a = make_arena();
+
+    int *x = PUSH_ONE(a, int);
+    *x = 10;
+
+    isize before = a->pos;
+
+    int *y = PUSH_ONE(a, int);
+    *y = 20;
+
+    arena_pop(a, sizeof(int));
+
+    ASSERT(a->pos == before);
+
+    arena_destroy(a);
+}
+
+TEST(test_arena_pop_to) {
+    Arena *a = make_arena();
+
+    int *a1 = PUSH_ONE(a, int);
+    int *a2 = PUSH_ONE(a, int);
+
+    isize mark = a->pos;
+
+    int *a3 = PUSH_ONE(a, int);
+
+    arena_pop_to(a, mark);
+
+    ASSERT(a->pos == mark);
+
+    arena_destroy(a);
+}
+
+TEST(test_arena_clear) {
+    Arena *a = make_arena();
+
+    PUSH_MANY(a, int, 1000);
+
+    arena_clear(a);
+
+    ASSERT(a->pos == ARENA_BASE_POS);
+
+    arena_destroy(a);
+}
+
+TEST(test_arena_temp_arena) {
+    Arena *a = make_arena();
+
+    isize start = a->pos;
+
+    Temp_Arena t = begin_temp_arena(a);
+
+    PUSH_MANY(a, int, 200);
+
+    end_temp_arena(t);
+
+    ASSERT(a->pos == start);
+
+    arena_destroy(a);
+}
+
+TEST(test_arena_nested_temp) {
+    Arena *a = make_arena();
+
+    isize start = a->pos;
+
+    Temp_Arena t1 = begin_temp_arena(a);
+    PUSH_MANY(a, int, 100);
+
+    Temp_Arena t2 = begin_temp_arena(a);
+    PUSH_MANY(a, int, 200);
+
+    end_temp_arena(t2);
+    end_temp_arena(t1);
+
+    ASSERT(a->pos == start);
+
+    arena_destroy(a);
+}
+
+
+TEST(test_arena_alignment) {
+    Arena *a = make_arena();
+
+    void *p1 = arena_push(a, 1, false);
+    void *p2 = arena_push(a, 1, false);
+
+    ASSERT(((uintptr_t)p1 % ARENA_ALIGN) == 0);
+    ASSERT(((uintptr_t)p2 % ARENA_ALIGN) == 0);
+
+    arena_destroy(a);
+}
+
+TEST(test_scratch_basic) {
+    Temp_Arena scratch = acquire_scratch_arena(NULL, 0);
+
+    Arena *a = scratch.arena;
+    isize start = a->pos;
+
+    int *x = PUSH_MANY(a, int, 100);
+    x[0] = 123;
+
+    release_scratch_arena(scratch);
+
+    ASSERT(a->pos == start);
+}
+
+TEST(test_scratch_reset) {
+    Temp_Arena s1 = acquire_scratch_arena(NULL, 0);
+    Arena *a = s1.arena;
+
+    PUSH_MANY(a, int, 200);
+
+    release_scratch_arena(s1);
+
+    Temp_Arena s2 = acquire_scratch_arena(NULL, 0);
+
+    ASSERT(s2.arena == a);
+    ASSERT(a->pos == s2.start_pos);
+
+    release_scratch_arena(s2);
+}
+
+TEST(test_scratch_conflict) {
+    Temp_Arena s1 = acquire_scratch_arena(NULL, 0);
+    Arena *a1 = s1.arena;
+
+    Arena *conflicts[1] = { a1 };
+
+    Temp_Arena s2 = acquire_scratch_arena(conflicts, 1);
+    Arena *a2 = s2.arena;
+
+    ASSERT(a1 != a2); // MUST be different
+
+    release_scratch_arena(s2);
+    release_scratch_arena(s1);
+}
+
+TEST(test_scratch_multiple_conflicts) {
+    Temp_Arena s1 = acquire_scratch_arena(NULL, 0);
+    Temp_Arena s2 = acquire_scratch_arena(NULL, 0);
+
+    Arena *conflicts[2] = { s1.arena, s2.arena };
+
+    Temp_Arena s3 = acquire_scratch_arena(conflicts, 2);
+
+    // With SCRATCH_POOL = 2, this may fallback or reuse.
+    // So we only check it's valid:
+    ASSERT(s3.arena != NULL);
+
+    release_scratch_arena(s3);
+    release_scratch_arena(s2);
+    release_scratch_arena(s1);
+}
+
+TEST(test_scratch_nested) {
+    Temp_Arena s1 = acquire_scratch_arena(NULL, 0);
+    Arena *a1 = s1.arena;
+
+    Arena *conflicts[1] = { a1 };
+
+    Temp_Arena s2 = acquire_scratch_arena(conflicts, 1);
+    Arena *a2 = s2.arena;
+
+    PUSH_MANY(a1, int, 50);
+    PUSH_MANY(a2, int, 50);
+
+    ASSERT(a1 != a2);
+
+    release_scratch_arena(s2);
+    release_scratch_arena(s1);
+}
+
+TEST(test_scratch_reuse) {
+    Temp_Arena s1 = acquire_scratch_arena(NULL, 0);
+    Arena *a1 = s1.arena;
+
+    release_scratch_arena(s1);
+
+    Temp_Arena s2 = acquire_scratch_arena(NULL, 0);
+    Arena *a2 = s2.arena;
+
+    ASSERT(a1 == a2); // should reuse same slot
+
+    release_scratch_arena(s2);
+}
+
+#if OS_WINDOWS
+
+#include <windows.h>
+#include <process.h>
+
+struct Thread_Result {
+    Arena *arena;
+};
+
+unsigned __stdcall thread_fn(void *arg) {
+    Thread_Result *res = (Thread_Result *)arg;
+
+    Temp_Arena scratch = acquire_scratch_arena(NULL, 0);
+    res->arena = scratch.arena;
+
+    int *x = PUSH_MANY(scratch.arena, int, 16);
+    x[0] = 123;
+
+    release_scratch_arena(scratch);
+
+    return 0;
+}
+
+TEST(test_thread_local_scratch) {
+    HANDLE t1, t2;
+
+    Thread_Result r1 = {0};
+    Thread_Result r2 = {0};
+
+    t1 = (HANDLE)_beginthreadex(NULL, 0, thread_fn, &r1, 0, NULL);
+    t2 = (HANDLE)_beginthreadex(NULL, 0, thread_fn, &r2, 0, NULL);
+
+    WaitForSingleObject(t1, INFINITE);
+    WaitForSingleObject(t2, INFINITE);
+
+    CloseHandle(t1);
+    CloseHandle(t2);
+
+    printf("Thread1 arena: %p\n", (void*)r1.arena);
+    printf("Thread2 arena: %p\n", (void*)r2.arena);
+
+    ASSERT(r1.arena != r2.arena);
+}
+
+TEST(test_thread_local_reuse) {
+    Temp_Arena s1 = acquire_scratch_arena(NULL, 0);
+    Arena *a1 = s1.arena;
+    release_scratch_arena(s1);
+
+    Temp_Arena s2 = acquire_scratch_arena(NULL, 0);
+    Arena *a2 = s2.arena;
+    release_scratch_arena(s2);
+
+    ASSERT(a1 == a2);
+}
+
+unsigned __stdcall thread_stress(void *arg) {
+    for (int i = 0; i < 1000; i++) {
+        Temp_Arena s = acquire_scratch_arena(NULL, 0);
+
+        int *x = PUSH_MANY(s.arena, int, 32);
+        x[0] = i;
+
+        release_scratch_arena(s);
+    }
+    return 0;
+}
+
+TEST(test_thread_stress) {
+    HANDLE threads[4];
+
+    for (int i = 0; i < 4; i++) {
+        threads[i] = (HANDLE)_beginthreadex(NULL, 0, thread_stress, NULL, 0, NULL);
+    }
+
+    WaitForMultipleObjects(4, threads, TRUE, INFINITE);
+
+    for (int i = 0; i < 4; i++) {
+        CloseHandle(threads[i]);
+    }
+}
+
+#endif
+
 // Arrays
 
 TEST(test_array_add) {

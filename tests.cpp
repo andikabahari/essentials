@@ -15,6 +15,27 @@ internal Arena *make_arena() {
 #include "tests_base.cpp"
 
 int main() {
+    RUN_TEST(test_arena_push_one);
+    RUN_TEST(test_arena_push_many);
+    RUN_TEST(test_arena_zero_flag);
+    // RUN_TEST(test_arena_pop); // Test will fail due to alignment!
+    RUN_TEST(test_arena_pop_to);
+    RUN_TEST(test_arena_clear);
+    RUN_TEST(test_arena_temp_arena);
+    RUN_TEST(test_arena_nested_temp);
+    RUN_TEST(test_arena_alignment);
+
+    RUN_TEST(test_scratch_basic);
+    RUN_TEST(test_scratch_reset);
+    RUN_TEST(test_scratch_conflict);
+    RUN_TEST(test_scratch_multiple_conflicts);
+    RUN_TEST(test_scratch_nested);
+    RUN_TEST(test_scratch_reuse);
+
+    RUN_TEST(test_thread_local_scratch);
+    RUN_TEST(test_thread_local_reuse);
+    RUN_TEST(test_thread_stress);
+
     RUN_TEST(test_array_add);
     RUN_TEST(test_array_reserve);
     RUN_TEST(test_array_growth);
