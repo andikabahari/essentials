@@ -289,11 +289,6 @@ struct String {
     u8 *data;
     isize len;
 
-    u8 &operator[](isize index) {
-        ASSERT(0 <= index && index < len);
-        return data[index];
-    }
-
     const u8 &operator[](isize index) const {
         ASSERT(0 <= index && index < len);
         return data[index];
@@ -301,10 +296,12 @@ struct String {
 };
 
 // Example: String s = LIT("Hello!");
-#define LIT(s) String{(u8 *)(s), sizeof(s)-1}
+#define LIT(s) String{ (u8 *)(s), sizeof(s)-1 }
 
 // Example: printf("%.*s\n", FMT(s));
 #define FMT(s) (int)(s).len, (const char *)(s).data
+
+inline String string_make(u8 *str, isize len);
 
 inline String string_from_cstr(const char *cstr);
 inline const char *string_to_cstr(Arena *arena, const String &s);
@@ -776,8 +773,13 @@ void array_unordered_remove(Array<T> *arr, isize index) {
 
 // Strings
 
+inline String string_make(u8 *str, isize len) {
+    ASSERT(len >= 0);
+    return String{ str, len };
+}
+
 inline String string_from_cstr(const char *cstr) {
-    return String{(u8 *)cstr, (isize)strlen(cstr)};
+    return string_make((u8 *)cstr, (isize)strlen(cstr));
 }
 
 inline const char *string_to_cstr(Arena *arena, const String &s) {
@@ -801,12 +803,12 @@ inline bool operator >  (const String &a, const String &b) { return string_gt(a,
 inline bool operator <= (const String &a, const String &b) { return string_le(a,b); }
 inline bool operator >= (const String &a, const String &b) { return string_ge(a,b); }
 
-template <isize N> inline bool operator == (const String &a, const char (&b)[N]) { return string_eq(a, String{(u8 *)b, N-1}); }
-template <isize N> inline bool operator != (const String &a, const char (&b)[N]) { return string_ne(a, String{(u8 *)b, N-1}); }
-template <isize N> inline bool operator <  (const String &a, const char (&b)[N]) { return string_lt(a, String{(u8 *)b, N-1}); }
-template <isize N> inline bool operator >  (const String &a, const char (&b)[N]) { return string_gt(a, String{(u8 *)b, N-1}); }
-template <isize N> inline bool operator <= (const String &a, const char (&b)[N]) { return string_le(a, String{(u8 *)b, N-1}); }
-template <isize N> inline bool operator >= (const String &a, const char (&b)[N]) { return string_ge(a, String{(u8 *)b, N-1}); }
+template <isize N> inline bool operator == (const String &a, const char (&b)[N]) { return string_eq(a, string_make((u8 *)b, N-1)); }
+template <isize N> inline bool operator != (const String &a, const char (&b)[N]) { return string_ne(a, string_make((u8 *)b, N-1)); }
+template <isize N> inline bool operator <  (const String &a, const char (&b)[N]) { return string_lt(a, string_make((u8 *)b, N-1)); }
+template <isize N> inline bool operator >  (const String &a, const char (&b)[N]) { return string_gt(a, string_make((u8 *)b, N-1)); }
+template <isize N> inline bool operator <= (const String &a, const char (&b)[N]) { return string_le(a, string_make((u8 *)b, N-1)); }
+template <isize N> inline bool operator >= (const String &a, const char (&b)[N]) { return string_ge(a, string_make((u8 *)b, N-1)); }
 
 template <> inline bool operator == (const String &a, const char (&b)[1]) { return a.len == 0; }
 template <> inline bool operator != (const String &a, const char (&b)[1]) { return a.len != 0; }
@@ -855,14 +857,14 @@ IDEF bool string_contains_byte(const String &s, u8 c) {
 
 IDEF String string_cut_prefix(const String &s, const String &prefix) {
     if (string_has_prefix(s, prefix)) {
-        return String{ s.data + prefix.len, s.len - prefix.len };
+        return string_make(s.data + prefix.len, s.len - prefix.len);
     }
     return s;
 }
 
 IDEF String string_cut_suffix(const String &s, const String &suffix) {
     if (string_has_suffix(s, suffix)) {
-        return String{ s.data, s.len - suffix.len };
+        return string_make(s.data, s.len - suffix.len);
     }
     return s;
 }
@@ -918,13 +920,13 @@ IDEF isize string_last_index_byte(const String &s, u8 c) {
 IDEF String string_trim_left(const String &s, const String &cutset) {
     isize i = 0;
     while (i < s.len && byte_in_set(s.data[i], cutset)) i++;
-    return String{ s.data + i, s.len - i };
+    return string_make(s.data + i, s.len - i);
 }
 
 IDEF String string_trim_right(const String &s, const String &cutset) {
     isize end = s.len;
     while (end > 0 && byte_in_set(s.data[end - 1], cutset)) end--;
-    return String{ s.data, end };
+    return string_make(s.data, end);
 }
 
 IDEF String string_trim_space(const String &s) {
@@ -934,7 +936,7 @@ IDEF String string_trim_space(const String &s) {
     isize end = s.len;
     while (end > start && is_space(s.data[end - 1])) end--;
 
-    return String{ s.data + start, end - start };
+    return string_make(s.data + start, end - start);
 }
 
 IDEF String string_trim(const String &s, const String &cutset) {
@@ -943,14 +945,14 @@ IDEF String string_trim(const String &s, const String &cutset) {
 
 IDEF String string_trim_prefix(const String &s, const String &prefix) {
     if (string_has_prefix(s, prefix)) {
-        return String{ s.data + prefix.len, s.len - prefix.len };
+        return string_make(s.data + prefix.len, s.len - prefix.len);
     }
     return s;
 }
 
 IDEF String string_trim_suffix(const String &s, const String &suffix) {
     if (string_has_suffix(s, suffix)) {
-        return String{ s.data, s.len - suffix.len };
+        return string_make(s.data, s.len - suffix.len);
     }
     return s;
 }
@@ -958,19 +960,19 @@ IDEF String string_trim_suffix(const String &s, const String &suffix) {
 IDEF String string_to_lower(Arena *arena, const String &s) {
     u8 *data = PUSH_MANY(arena, u8, s.len);
     for (isize i = 0; i < s.len; i++) data[i] = to_lower(s.data[i]);
-    return String{ data, s.len };
+    return string_make(data, s.len);
 }
 
 IDEF String string_to_upper(Arena *arena, const String &s) {
     u8 *data = PUSH_MANY(arena, u8, s.len);
     for (isize i = 0; i < s.len; i++) data[i] = to_upper(s.data[i]);
-    return String{ data, s.len };
+    return string_make(data, s.len);
 }
 
 IDEF String string_clone(Arena *arena, const String &s) {
     u8 *data = PUSH_MANY(arena, u8, s.len);
     mem_copy(data, s.data, s.len);
-    return String{ data, s.len };
+    return string_make(data, s.len);
 }
 
 IDEF String string_concat(Arena *arena, const String &a, const String &b) {
@@ -980,11 +982,11 @@ IDEF String string_concat(Arena *arena, const String &a, const String &b) {
     mem_copy(data, a.data, a.len);
     mem_copy(data + a.len, b.data, b.len);
 
-    return String{ data, len };
+    return string_make(data, len);
 }
 
 IDEF String string_join(Arena *arena, const Array<String> &elems, const String &sep) {
-    if (elems.len == 0) return String{0,0};
+    if (elems.len == 0) return string_make((u8 *)NULL, 0);
 
     // compute total length
     isize total = 0;
@@ -1009,7 +1011,7 @@ IDEF String string_join(Arena *arena, const Array<String> &elems, const String &
         }
     }
 
-    return String{ data, total };
+    return string_make(data, total);
 }
 
 IDEF Array<String> string_split(Arena *arena, const String &s, const String &sep) {
@@ -1019,7 +1021,7 @@ IDEF Array<String> string_split(Arena *arena, const String &s, const String &sep
     if (sep.len == 0) {
         // split into bytes
         for (isize i = 0; i < s.len; i++) {
-            array_add(&result, String{ s.data + i, 1 });
+            array_add(&result, string_make(s.data + i, 1));
         }
         return result;
     }
@@ -1028,22 +1030,20 @@ IDEF Array<String> string_split(Arena *arena, const String &s, const String &sep
 
     while (start <= s.len) {
         isize idx = string_index(
-            String{ s.data + start, s.len - start }, sep
+            string_make(s.data + start, s.len - start), sep
         );
 
         if (idx < 0) {
             // last segment
-            array_add(&result, String{
-                s.data + start,
-                s.len - start
-            });
+            array_add(&result, string_make(
+                        s.data + start,
+                        s.len - start));
             break;
         }
 
-        array_add(&result, String{
-            s.data + start,
-            idx
-        });
+        array_add(&result, string_make(
+                    s.data + start,
+                    idx));
 
         start += idx + sep.len;
     }
@@ -1095,7 +1095,7 @@ IDEF String string_replace(
         }
     }
 
-    return String{ data, new_len };
+    return string_make(data, new_len);
 }
 
 #endif // BASE_IMPLEMENTATION
@@ -1129,7 +1129,7 @@ template <typename K, typename V>
 void table_init(Table<K, V> *t, isize cap, Arena *arena) {
     t->cap = cap;
     t->len = 0;
-    t->arena = NULL;
+    t->arena = arena;
 
     if (arena) {
         t->entries = (Table_Entry<K, V> *)

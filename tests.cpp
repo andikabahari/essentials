@@ -75,6 +75,7 @@ int main() {
     RUN_TEST(test_table_collision_string);
     RUN_TEST(test_table_delete_string);
     RUN_TEST(test_table_content_eq_string);
+    RUN_TEST(test_table_stress_string);
 
     printf("All tests passed!\n");
     return 0;

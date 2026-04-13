@@ -611,7 +611,7 @@ TEST(test_string_ops_cstr) {
 }
 
 TEST(test_string_ops_empty_cstr) {
-    String empty = {0, 0};
+    String empty = string_make(NULL, 0);
     String nonempty = LIT("x");
 
     ASSERT(empty == "");
@@ -719,8 +719,10 @@ TEST(test_table_grow) {
 }
 
 TEST(test_table_stress) {
+    Arena *arena = make_arena();
+
     Table<u64, int> t;
-    table_init(&t, 16);
+    table_init(&t, 16, arena);
 
     for (u64 i = 0; i < 10000; i++) {
         table_set(&t, i, (int)i);
@@ -737,6 +739,8 @@ TEST(test_table_stress) {
     for (u64 i = 0; i < 10000; i++) {
         ASSERT(table_get(&t, i) == NULL);
     }
+
+    arena_destroy(arena);
 }
 
 TEST(test_table_basic_string) {
@@ -748,7 +752,7 @@ TEST(test_table_basic_string) {
 
     ASSERT(*table_get(&t, LIT("apple")) == 10);
     ASSERT(*table_get(&t, LIT("banana")) == 20);
-    ASSERT(table_get(&t, LIT("orange")) == nullptr);
+    ASSERT(table_get(&t, LIT("orange")) == NULL);
 }
 
 TEST(test_table_overwrite_string) {
@@ -784,7 +788,7 @@ TEST(test_table_delete_string) {
 
     table_remove(&t, LIT("hello"));
 
-    ASSERT(table_get(&t, LIT("hello")) == nullptr);
+    ASSERT(table_get(&t, LIT("hello")) == NULL);
     ASSERT(*table_get(&t, LIT("world")) == 2);
 }
 
@@ -795,7 +799,94 @@ TEST(test_table_content_eq_string) {
     Table<String, String> t;
     table_init(&t, 16);
 
-    table_set(&t, String{a, 4}, LIT("hey"));
+    table_set(&t, string_make(a, 4), LIT("hey"));
 
-    ASSERT(*table_get(&t, String{b, 4}) == LIT("hey"));
+    ASSERT(*table_get(&t, string_make(b, 4)) == LIT("hey"));
+}
+
+String make_num_string(Arena *arena, u64 x) {
+    char buf[32];
+    isize len = 0;
+
+    do {
+        buf[len++] = '0' + (x % 10);
+        x /= 10;
+    } while (x);
+
+    // reverse in-place
+    for (isize i = 0; i < len / 2; i++) {
+        char tmp = buf[i];
+        buf[i] = buf[len - 1 - i];
+        buf[len - 1 - i] = tmp;
+    }
+
+    return string_clone(arena, string_make((u8 *)buf, len));
+}
+
+TEST(test_table_stress_string) {
+    Arena *arena = make_arena();
+
+    Table<String, String> t;
+    table_init(&t, 16, arena);
+
+    const u64 N = 10000;
+
+    for (u64 i = 0; i < N; i++) {
+        String key = make_num_string(arena, i);
+        String val = make_num_string(arena, i);
+
+        table_set(&t, key, val);
+    }
+
+    for (u64 i = 0; i < N; i++) {
+        String key = make_num_string(arena, i);
+        String *v = table_get(&t, key);
+
+        ASSERT(v != NULL);
+
+        String expected = make_num_string(arena, i);
+        ASSERT(string_eq(*v, expected));
+    }
+
+    for (u64 i = 0; i < N; i += 2) {
+        String key = make_num_string(arena, i);
+        ASSERT(table_remove(&t, key) == true);
+    }
+
+    for (u64 i = 0; i < N; i++) {
+        String key = make_num_string(arena, i);
+        String *v = table_get(&t, key);
+
+        if (i % 2 == 0) {
+            ASSERT(v == NULL);
+        } else {
+            ASSERT(v != NULL);
+            String expected = make_num_string(arena, i);
+            ASSERT(string_eq(*v, expected));
+        }
+    }
+
+    for (u64 i = 0; i < N; i += 2) {
+        String key = make_num_string(arena, i);
+        String val = make_num_string(arena, i + 1000000);
+
+        table_set(&t, key, val);
+    }
+
+    for (u64 i = 0; i < N; i++) {
+        String key = make_num_string(arena, i);
+        String *v = table_get(&t, key);
+
+        ASSERT(v != NULL);
+
+        if (i % 2 == 0) {
+            String expected = make_num_string(arena, i + 1000000);
+            ASSERT(string_eq(*v, expected));
+        } else {
+            String expected = make_num_string(arena, i);
+            ASSERT(string_eq(*v, expected));
+        }
+    }
+
+    arena_destroy(arena);
 }
