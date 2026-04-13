@@ -187,7 +187,7 @@ struct Arena {
 
 IDEF Arena *arena_create(isize reserve_size, isize commit_size);
 IDEF void arena_destroy(Arena *a);
-IDEF void *arena_push(Arena *a, isize size, bool non_zero);
+IDEF void *arena_push(Arena *a, isize size, bool non_zero = false);
 IDEF void arena_pop(Arena *a, isize size);
 IDEF void arena_pop_to(Arena *a, isize pos);
 IDEF void arena_clear(Arena *a);
@@ -424,7 +424,7 @@ template <typename K, typename V>
 bool table_remove(Table<K, V> *t, K key);
 
 template <typename K, typename V>
-void table_rehash(Table<K, V> *t, isize new_cap, Arena *arena);
+void table_resize(Table<K, V> *t, isize new_cap, Arena *arena);
 
 //
 // DEFINITION
@@ -781,7 +781,7 @@ inline String string_from_cstr(const char *cstr) {
 }
 
 inline const char *string_to_cstr(Arena *arena, const String &s) {
-    char *buf = (char *)arena_push(arena, s.len + 1, false);
+    char *buf = (char *)arena_push(arena, s.len + 1);
     mem_copy(buf, s.data, s.len);
     buf[s.len] = 0;
     return buf;
@@ -1133,7 +1133,7 @@ void table_init(Table<K, V> *t, isize cap, Arena *arena) {
 
     if (arena) {
         t->entries = (Table_Entry<K, V> *)
-            arena_push(arena, sizeof(Table_Entry<K, V>) * cap, false);
+            arena_push(arena, sizeof(Table_Entry<K, V>) * cap);
     } else {
         t->entries = (Table_Entry<K, V> *)
             mem_alloc(sizeof(Table_Entry<K, V>) * cap);
@@ -1181,7 +1181,7 @@ bool table_set(Table<K, V> *t, K key, const V &value) {
     // Reference: https://github.com/djiangtw/data-structures-in-practice-public/blob/main/manuscript/chapters/chapter07.md
     //
     if (t->len >= t->cap * 0.7) {
-        table_rehash(t, t->cap * 2, t->arena);
+        table_resize(t, t->cap * 2, t->arena);
     }
 
     isize index = table_find_slot(t, key);
@@ -1219,7 +1219,7 @@ bool table_remove(Table<K, V> *t, K key) {
 
     for (;;) {
         auto *e = &t->entries[index];
-        if (e->state == TABLE_SLOT_EMPTY) return NULL;
+        if (e->state == TABLE_SLOT_EMPTY) return false;
         if (e->state == TABLE_SLOT_OCCUPIED) {
             if (e->key == key) {
                 e->state = TABLE_SLOT_TOMBSTONE;
@@ -1232,14 +1232,14 @@ bool table_remove(Table<K, V> *t, K key) {
 }
 
 template <typename K, typename V>
-void table_rehash(Table<K, V> *t, isize new_cap, Arena *arena) {
+void table_resize(Table<K, V> *t, isize new_cap, Arena *arena) {
     Table_Entry<K, V> *old_entries = t->entries;
     isize old_cap = t->cap;
 
     Table_Entry<K, V> *new_entries;
     if (t->arena) {
         new_entries = (Table_Entry<K, V> *)
-            arena_push(t->arena, sizeof(Table_Entry<K, V>) * new_cap, false);
+            arena_push(t->arena, sizeof(Table_Entry<K, V>) * new_cap);
     } else {
         new_entries = (Table_Entry<K, V> *)
             mem_alloc(sizeof(Table_Entry<K, V>) * new_cap);
