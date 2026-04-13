@@ -63,6 +63,19 @@ int main() {
     RUN_TEST(test_string_ops_edge_cases);
     RUN_TEST(test_string_ops_length);
 
+    RUN_TEST(test_table_basic);
+    RUN_TEST(test_table_overwrite);
+    RUN_TEST(test_table_collision);
+    RUN_TEST(test_table_delete);
+    RUN_TEST(test_table_tombstone_reuse);
+    RUN_TEST(test_table_grow);
+    RUN_TEST(test_table_stress);
+    RUN_TEST(test_table_basic_string);
+    RUN_TEST(test_table_overwrite_string);
+    RUN_TEST(test_table_collision_string);
+    RUN_TEST(test_table_delete_string);
+    RUN_TEST(test_table_content_eq_string);
+
     printf("All tests passed!\n");
     return 0;
 }

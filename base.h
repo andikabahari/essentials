@@ -367,6 +367,65 @@ IDEF String string_join(Arena *arena, const Array<String> &elems, const String &
 IDEF Array<String> string_split(Arena *arena, const String &s, const String &sep);
 IDEF String string_replace(Arena *arena, const String &s, const String &oldstr, const String &newstr);
 
+// Hash tables
+
+//
+// I'm still wondering whether to make string to be owning or non-owning,
+// whether to use Robin Hood probing, and whether should I use
+// `index = hash % cap` or `index = hash & (cap - 1)`
+//  where `cap` is a power-of-2 number.
+//
+
+enum {
+    TABLE_SLOT_EMPTY,
+    TABLE_SLOT_OCCUPIED,
+    TABLE_SLOT_TOMBSTONE,
+};
+
+template <typename K, typename V>
+struct Table_Entry {
+    K key;
+    V value;
+    u8 state;
+};
+
+template <typename K, typename V>
+struct Table {
+    Table_Entry<K, V> *entries;
+    isize cap;
+    isize len;
+
+    Arena *arena;
+};
+
+inline u32 table_hash(u64 x);
+
+template <typename T>
+inline u32 table_hash(T *ptr);
+
+inline u32 table_hash(const String &s);
+
+template <typename K, typename V>
+void table_init(Table<K, V> *t, isize cap = 64, Arena *arena = NULL);
+
+template <typename K, typename V>
+void table_free(Table<K, V> *t);
+
+template <typename K, typename V>
+isize table_find_slot(Table<K, V> *t, K key);
+
+template <typename K, typename V>
+bool table_set(Table<K, V> *t, K key, const V &value);
+
+template <typename K, typename V>
+V *table_get(Table<K, V> *t, K key);
+
+template <typename K, typename V>
+bool table_remove(Table<K, V> *t, K key);
+
+template <typename K, typename V>
+void table_rehash(Table<K, V> *t, isize new_cap, Arena *arena);
+
 //
 // DEFINITION
 //
@@ -1040,5 +1099,168 @@ IDEF String string_replace(
 }
 
 #endif // BASE_IMPLEMENTATION
+
+// Hash tables
+
+inline u32 table_hash(u64 x) {
+    x ^= x >> 33;
+    x *= 0xff51afd7ed558ccdULL;
+    x ^= x >> 33;
+    x *= 0xc4ceb9fe1a85ec53ULL;
+    x ^= x >> 33;
+    return (u32)x;
+}
+
+template <typename T>
+inline u32 table_hash(T *ptr) {
+    return table_hash((u64)ptr);
+}
+
+inline u32 table_hash(const String &s) {
+    u32 h = 2166136261u;
+    for (isize i = 0; i < s.len; i++) {
+        h ^= (u8)s.data[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+template <typename K, typename V>
+void table_init(Table<K, V> *t, isize cap, Arena *arena) {
+    t->cap = cap;
+    t->len = 0;
+    t->arena = NULL;
+
+    if (arena) {
+        t->entries = (Table_Entry<K, V> *)
+            arena_push(arena, sizeof(Table_Entry<K, V>) * cap, false);
+    } else {
+        t->entries = (Table_Entry<K, V> *)
+            mem_alloc(sizeof(Table_Entry<K, V>) * cap);
+    }
+
+    for (isize i = 0; i < cap; i++) {
+        t->entries[i].state = TABLE_SLOT_EMPTY;
+    }
+}
+
+template <typename K, typename V>
+void table_free(Table<K, V> *t) {
+    if (!t->arena && t->entries) {
+        mem_free(t->entries);
+    }
+}
+
+template <typename K, typename V>
+isize table_find_slot(Table<K, V> *t, K key) {
+    u32 h = table_hash(key);
+    isize index = h % t->cap;
+    isize first_tombstone = -1;
+    
+    for (;;) {
+        auto *e = &t->entries[index];
+        if (e->state == TABLE_SLOT_EMPTY) {
+            return first_tombstone != -1 ? first_tombstone : index;
+        }
+        if (e->state == TABLE_SLOT_TOMBSTONE) {
+            if (first_tombstone == -1) {
+                first_tombstone = index;
+            }
+        }
+        if (e->key == key) {
+            return index;
+        }
+        index = (index + 1) % t->cap;
+    }
+}
+
+template <typename K, typename V>
+bool table_set(Table<K, V> *t, K key, const V &value) {
+    //
+    // Open addressing: Must stay below 0.7-0.8 or performance collapses
+    // Reference: https://github.com/djiangtw/data-structures-in-practice-public/blob/main/manuscript/chapters/chapter07.md
+    //
+    if (t->len >= t->cap * 0.7) {
+        table_rehash(t, t->cap * 2, t->arena);
+    }
+
+    isize index = table_find_slot(t, key);
+    auto *e = &t->entries[index];
+
+    if (e->state != TABLE_SLOT_OCCUPIED) {
+        e->state = TABLE_SLOT_OCCUPIED;
+        e->key = key;
+        t->len++;
+    }
+    e->value = value;
+
+    return true;
+}
+
+template <typename K, typename V>
+V *table_get(Table<K, V> *t, K key) {
+    u32 h = table_hash(key);
+    isize index = h % t->cap;
+
+    for (;;) {
+        auto *e = &t->entries[index];
+        if (e->state == TABLE_SLOT_EMPTY) return NULL;
+        if (e->state == TABLE_SLOT_OCCUPIED) {
+            if (e->key == key) return &e->value;
+        }
+        index = (index + 1) % t->cap;
+    }
+}
+
+template <typename K, typename V>
+bool table_remove(Table<K, V> *t, K key) {
+    u32 h = table_hash(key);
+    isize index = h % t->cap;
+
+    for (;;) {
+        auto *e = &t->entries[index];
+        if (e->state == TABLE_SLOT_EMPTY) return NULL;
+        if (e->state == TABLE_SLOT_OCCUPIED) {
+            if (e->key == key) {
+                e->state = TABLE_SLOT_TOMBSTONE;
+                t->len--;
+                return true;
+            }
+        }
+        index = (index + 1) % t->cap;
+    }
+}
+
+template <typename K, typename V>
+void table_rehash(Table<K, V> *t, isize new_cap, Arena *arena) {
+    Table_Entry<K, V> *old_entries = t->entries;
+    isize old_cap = t->cap;
+
+    Table_Entry<K, V> *new_entries;
+    if (t->arena) {
+        new_entries = (Table_Entry<K, V> *)
+            arena_push(t->arena, sizeof(Table_Entry<K, V>) * new_cap, false);
+    } else {
+        new_entries = (Table_Entry<K, V> *)
+            mem_alloc(sizeof(Table_Entry<K, V>) * new_cap);
+    }
+
+    t->entries = new_entries;
+    t->cap = new_cap;
+    t->len = 0;
+
+    for (isize i = 0; i < new_cap; i++) {
+        new_entries[i].state = TABLE_SLOT_EMPTY;
+    }
+
+    for (isize i = 0; i < old_cap; i++) {
+        auto *e = &old_entries[i];
+        if (e->state == TABLE_SLOT_OCCUPIED) {
+            table_set(t, e->key, e->value);
+        }
+    }
+
+    if (!t->arena) mem_free(old_entries);
+}
 
 #endif // BASE_H

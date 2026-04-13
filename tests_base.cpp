@@ -641,3 +641,161 @@ TEST(test_string_ops_length) {
     ASSERT(short_s < long_s);
     ASSERT(long_s > short_s);
 }
+
+// Hash tables
+
+TEST(test_table_basic) {
+    Table<u64, int> t;
+    table_init(&t, 16);
+
+    table_set(&t, (u64)1, 10);
+    table_set(&t, (u64)2, 20);
+
+    ASSERT(*table_get(&t, (u64)1) == 10);
+    ASSERT(*table_get(&t, (u64)2) == 20);
+    ASSERT(table_get(&t, (u64)3) == NULL);
+}
+
+TEST(test_table_overwrite) {
+    Table<u64, int> t;
+    table_init(&t, 16);
+
+    table_set(&t, (u64)1, 10);
+    table_set(&t, (u64)1, 99);
+
+    ASSERT(*table_get(&t, (u64)1) == 99);
+    ASSERT(t.len == 1);
+}
+
+TEST(test_table_collision) {
+    Table<u64, int> t;
+    table_init(&t, 4);
+
+    table_set(&t, (u64)1, 10);
+    table_set(&t, (u64)5, 20); // likely same bucket
+    table_set(&t, (u64)9, 30);
+
+    ASSERT(*table_get(&t, (u64)1) == 10);
+    ASSERT(*table_get(&t, (u64)5) == 20);
+    ASSERT(*table_get(&t, (u64)9) == 30);
+}
+
+TEST(test_table_delete) {
+    Table<u64, int> t;
+    table_init(&t, 8);
+
+    table_set(&t, (u64)1, 10);
+    table_set(&t, (u64)9, 20); // collision chain
+
+    ASSERT(table_remove(&t, (u64)1) == true);
+
+    ASSERT(table_get(&t, (u64)1) == NULL);
+    ASSERT(*table_get(&t, (u64)9) == 20); // must still work
+}
+
+TEST(test_table_tombstone_reuse) {
+    Table<u64, int> t;
+    table_init(&t, 8);
+
+    table_set(&t, (u64)1, 10);
+    table_remove(&t, (u64)1);
+
+    table_set(&t, (u64)1, 20);
+
+    ASSERT(*table_get(&t, (u64)1) == 20);
+}
+
+TEST(test_table_grow) {
+    Table<u64, int> t;
+    table_init(&t, 4);
+
+    for (u64 i = 0; i < 100; i++) {
+        table_set(&t, i, (int)i);
+    }
+
+    for (u64 i = 0; i < 100; i++) {
+        ASSERT(*table_get(&t, i) == (int)i);
+    }
+}
+
+TEST(test_table_stress) {
+    Table<u64, int> t;
+    table_init(&t, 16);
+
+    for (u64 i = 0; i < 10000; i++) {
+        table_set(&t, i, (int)i);
+    }
+
+    for (u64 i = 0; i < 10000; i++) {
+        ASSERT(*table_get(&t, i) == (int)i);
+    }
+
+    for (u64 i = 0; i < 10000; i++) {
+        table_remove(&t, i);
+    }
+
+    for (u64 i = 0; i < 10000; i++) {
+        ASSERT(table_get(&t, i) == NULL);
+    }
+}
+
+TEST(test_table_basic_string) {
+    Table<String, int> t;
+    table_init(&t, 16);
+
+    table_set(&t, LIT("apple"), 10);
+    table_set(&t, LIT("banana"), 20);
+
+    ASSERT(*table_get(&t, LIT("apple")) == 10);
+    ASSERT(*table_get(&t, LIT("banana")) == 20);
+    ASSERT(table_get(&t, LIT("orange")) == nullptr);
+}
+
+TEST(test_table_overwrite_string) {
+    Table<String, int> t;
+    table_init(&t, 16);
+
+    table_set(&t, LIT("key"), 1);
+    table_set(&t, LIT("key"), 2);
+
+    ASSERT(*table_get(&t, LIT("key")) == 2);
+    ASSERT(t.len == 1);
+}
+
+TEST(test_table_collision_string) {
+    Table<String, int> t;
+    table_init(&t, 4);
+
+    table_set(&t, LIT("a"), 1);
+    table_set(&t, LIT("b"), 2);
+    table_set(&t, LIT("c"), 3);
+
+    ASSERT(*table_get(&t, LIT("a")) == 1);
+    ASSERT(*table_get(&t, LIT("b")) == 2);
+    ASSERT(*table_get(&t, LIT("c")) == 3);
+}
+
+TEST(test_table_delete_string) {
+    Table<String, int> t;
+    table_init(&t, 8);
+
+    table_set(&t, LIT("hello"), 1);
+    table_set(&t, LIT("world"), 2);
+
+    table_remove(&t, LIT("hello"));
+
+    ASSERT(table_get(&t, LIT("hello")) == nullptr);
+    ASSERT(*table_get(&t, LIT("world")) == 2);
+}
+
+TEST(test_table_content_eq_string) {
+    u8 a[] = "test";
+    u8 b[] = "test";
+
+    Table<String, String> t;
+    table_init(&t, 16);
+
+    table_set(&t, String{a, 4}, LIT("hey"));
+
+    ASSERT(*table_get(&t, String{b, 4}) == LIT("hey"));
+}
