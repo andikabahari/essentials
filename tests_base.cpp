@@ -244,7 +244,7 @@ struct Thread_Result {
     Arena *arena;
 };
 
-unsigned __stdcall thread_fn(void *arg) {
+internal unsigned __stdcall thread_fn(void *arg) {
     Thread_Result *res = (Thread_Result *)arg;
 
     Temp_Arena scratch = acquire_scratch_arena(NULL, 0);
@@ -291,7 +291,7 @@ TEST(test_thread_local_reuse) {
     ASSERT(a1 == a2);
 }
 
-unsigned __stdcall thread_stress(void *arg) {
+internal unsigned __stdcall thread_stress(void *arg) {
     for (int i = 0; i < 1000; i++) {
         Temp_Arena s = acquire_scratch_arena(NULL, 0);
 
@@ -804,7 +804,7 @@ TEST(test_table_content_eq_string) {
     ASSERT(*table_get(&t, string_make(b, 4)) == LIT("hey"));
 }
 
-String make_num_string(Arena *arena, u64 x) {
+internal String make_num_string(Arena *arena, u64 x) {
     char buf[32];
     isize len = 0;
 
@@ -889,4 +889,75 @@ TEST(test_table_stress_string) {
     }
 
     arena_destroy(arena);
+}
+
+// Scope-based defer
+
+TEST(test_defer_basic) {
+    int x = 0;
+
+    {
+        defer(x = 1);
+    }
+
+    ASSERT(x == 1);
+}
+
+TEST(test_defer_lifo) {
+    int x = 0;
+
+    {
+        defer(x = x * 10 + 1); // last
+        defer(x = x * 10 + 2);
+        defer(x = x * 10 + 3); // first
+    }
+
+    ASSERT(x == 321);
+}
+
+TEST(test_defer_nested) {
+    int x = 0;
+
+    {
+        defer(x += 1);
+
+        {
+            defer(x += 2);
+        }
+
+        ASSERT(x == 2);
+    }
+
+    ASSERT(x == 3);
+}
+
+internal int defer_return_inner() {
+    int x = 0;
+
+    {
+        defer(x = 42);
+        return x;
+    }
+}
+
+TEST(test_defer_return) {
+    int r = defer_return_inner();
+    ASSERT(r == 0);
+}
+
+global_var bool freed = false;
+
+internal void fake_free(void *) {
+    freed = true;
+}
+
+TEST(test_defer_resource) {
+    freed = false;
+
+    {
+        void* ptr = (void *)1234;
+        defer(fake_free(ptr));
+    }
+
+    ASSERT(freed == true);
 }

@@ -156,6 +156,29 @@ STATIC_ASSERT(sizeof(u64) == 8, "u64 size incorrect");
     #error "Unsupported OS"
 #endif
 
+// Scope-based defer
+// From: https://github.com/gingerBill/gb/blob/master/gb.h
+
+template <typename T> struct gbRemoveReference       { typedef T Type; };
+template <typename T> struct gbRemoveReference<T &>  { typedef T Type; };
+template <typename T> struct gbRemoveReference<T &&> { typedef T Type; };
+
+template <typename T> inline T &&gb_forward(typename gbRemoveReference<T>::Type &t)  { return static_cast<T &&>(t); }
+template <typename T> inline T &&gb_forward(typename gbRemoveReference<T>::Type &&t) { return static_cast<T &&>(t); }
+template <typename T> inline T &&gb_move   (T &&t)                                   { return static_cast<typename gbRemoveReference<T>::Type &&>(t); }
+template <typename F>
+struct gbprivDefer {
+    F f;
+    gbprivDefer(F &&f) : f(gb_forward<F>(f)) {}
+    ~gbprivDefer() { f(); }
+};
+template <typename F> gbprivDefer<F> gb__defer_func(F &&f) { return gbprivDefer<F>(gb_forward<F>(f)); }
+
+#define GB_DEFER_1(x, y) x##y
+#define GB_DEFER_2(x, y) GB_DEFER_1(x, y)
+#define GB_DEFER_3(x)    GB_DEFER_2(x, __COUNTER__)
+#define defer(code)      auto GB_DEFER_3(_defer_) = gb__defer_func([&]()->void{code;})
+
 // Memory
 
 inline void *mem_alloc(isize size);

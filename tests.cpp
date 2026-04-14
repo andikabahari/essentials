@@ -77,6 +77,11 @@ int main() {
     RUN_TEST(test_table_content_eq_string);
     RUN_TEST(test_table_stress_string);
 
+    RUN_TEST(test_defer_basic);
+    RUN_TEST(test_defer_lifo);
+    RUN_TEST(test_defer_nested);
+    RUN_TEST(test_defer_return);
+
     printf("All tests passed!\n");
     return 0;
 }
