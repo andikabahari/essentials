@@ -326,6 +326,8 @@ struct String {
 
 inline String string_make(u8 *str, isize len);
 
+inline String string_empty();
+
 inline String string_from_cstr(const char *cstr);
 inline const char *string_to_cstr(Arena *arena, const String &s);
 
@@ -801,6 +803,10 @@ inline String string_make(u8 *str, isize len) {
     return String{ str, len };
 }
 
+inline String string_empty() {
+    return string_make((u8 *)NULL, 0);
+}
+
 inline String string_from_cstr(const char *cstr) {
     return string_make((u8 *)cstr, (isize)strlen(cstr));
 }
@@ -1009,7 +1015,7 @@ IDEF String string_concat(Arena *arena, const String &a, const String &b) {
 }
 
 IDEF String string_join(Arena *arena, const Array<String> &elems, const String &sep) {
-    if (elems.len == 0) return string_make((u8 *)NULL, 0);
+    if (elems.len == 0) return string_empty();
 
     // compute total length
     isize total = 0;

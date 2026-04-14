@@ -611,7 +611,7 @@ TEST(test_string_ops_cstr) {
 }
 
 TEST(test_string_ops_empty_cstr) {
-    String empty = string_make(NULL, 0);
+    String empty = string_empty();
     String nonempty = LIT("x");
 
     ASSERT(empty == "");
@@ -654,6 +654,8 @@ TEST(test_table_basic) {
     ASSERT(*table_get(&t, (u64)1) == 10);
     ASSERT(*table_get(&t, (u64)2) == 20);
     ASSERT(table_get(&t, (u64)3) == NULL);
+
+    table_free(&t);
 }
 
 TEST(test_table_overwrite) {
@@ -678,6 +680,8 @@ TEST(test_table_collision) {
     ASSERT(*table_get(&t, (u64)1) == 10);
     ASSERT(*table_get(&t, (u64)5) == 20);
     ASSERT(*table_get(&t, (u64)9) == 30);
+
+    table_free(&t);
 }
 
 TEST(test_table_delete) {
@@ -691,6 +695,8 @@ TEST(test_table_delete) {
 
     ASSERT(table_get(&t, (u64)1) == NULL);
     ASSERT(*table_get(&t, (u64)9) == 20); // must still work
+
+    table_free(&t);
 }
 
 TEST(test_table_tombstone_reuse) {
@@ -703,6 +709,8 @@ TEST(test_table_tombstone_reuse) {
     table_set(&t, (u64)1, 20);
 
     ASSERT(*table_get(&t, (u64)1) == 20);
+
+    table_free(&t);
 }
 
 TEST(test_table_grow) {
@@ -716,6 +724,8 @@ TEST(test_table_grow) {
     for (u64 i = 0; i < 100; i++) {
         ASSERT(*table_get(&t, i) == (int)i);
     }
+
+    table_free(&t);
 }
 
 TEST(test_table_stress) {
@@ -753,6 +763,8 @@ TEST(test_table_basic_string) {
     ASSERT(*table_get(&t, LIT("apple")) == 10);
     ASSERT(*table_get(&t, LIT("banana")) == 20);
     ASSERT(table_get(&t, LIT("orange")) == NULL);
+
+    table_free(&t);
 }
 
 TEST(test_table_overwrite_string) {
@@ -764,6 +776,8 @@ TEST(test_table_overwrite_string) {
 
     ASSERT(*table_get(&t, LIT("key")) == 2);
     ASSERT(t.len == 1);
+
+    table_free(&t);
 }
 
 TEST(test_table_collision_string) {
@@ -777,6 +791,8 @@ TEST(test_table_collision_string) {
     ASSERT(*table_get(&t, LIT("a")) == 1);
     ASSERT(*table_get(&t, LIT("b")) == 2);
     ASSERT(*table_get(&t, LIT("c")) == 3);
+
+    table_free(&t);
 }
 
 TEST(test_table_delete_string) {
@@ -790,6 +806,8 @@ TEST(test_table_delete_string) {
 
     ASSERT(table_get(&t, LIT("hello")) == NULL);
     ASSERT(*table_get(&t, LIT("world")) == 2);
+
+    table_free(&t);
 }
 
 TEST(test_table_content_eq_string) {
@@ -802,6 +820,8 @@ TEST(test_table_content_eq_string) {
     table_set(&t, string_make(a, 4), LIT("hey"));
 
     ASSERT(*table_get(&t, string_make(b, 4)) == LIT("hey"));
+
+    table_free(&t);
 }
 
 internal String make_num_string(Arena *arena, u64 x) {
