@@ -448,6 +448,9 @@ bool table_remove(Table<K, V> *t, K key);
 template <typename K, typename V>
 void table_resize(Table<K, V> *t, isize new_cap, Arena *arena);
 
+template <typename K, typename V>
+void table_clear(Table<K, V> *t);
+
 //
 // DEFINITION
 //
@@ -1131,6 +1134,7 @@ IDEF String string_replace(
 
 // Hash tables
 
+// Murmur
 inline u32 table_hash(u64 x) {
     x ^= x >> 33;
     x *= 0xff51afd7ed558ccdULL;
@@ -1145,6 +1149,7 @@ inline u32 table_hash(T *ptr) {
     return table_hash((u64)ptr);
 }
 
+// FNV-1a
 inline u32 table_hash(const String &s) {
     u32 h = 2166136261u;
     for (isize i = 0; i < s.len; i++) {
@@ -1290,6 +1295,15 @@ void table_resize(Table<K, V> *t, isize new_cap, Arena *arena) {
     }
 
     if (!t->arena) mem_free(old_entries);
+}
+
+template <typename K, typename V>
+void table_clear(Table<K, V> *t) {
+    for (isize i = 0; i < t->cap; i++) {
+        t->entries[i].state = TABLE_SLOT_EMPTY;
+    }
+
+    t->len = 0;
 }
 
 #endif // BASE_H

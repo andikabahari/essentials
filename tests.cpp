@@ -15,6 +15,11 @@ internal Arena *make_arena() {
 #include "tests_base.cpp"
 
 int main() {
+    RUN_TEST(test_defer_basic);
+    RUN_TEST(test_defer_lifo);
+    RUN_TEST(test_defer_nested);
+    RUN_TEST(test_defer_return);
+
     RUN_TEST(test_arena_push_one);
     RUN_TEST(test_arena_push_many);
     RUN_TEST(test_arena_zero_flag);
@@ -76,11 +81,7 @@ int main() {
     RUN_TEST(test_table_delete_string);
     RUN_TEST(test_table_content_eq_string);
     RUN_TEST(test_table_stress_string);
-
-    RUN_TEST(test_defer_basic);
-    RUN_TEST(test_defer_lifo);
-    RUN_TEST(test_defer_nested);
-    RUN_TEST(test_defer_return);
+    RUN_TEST(test_table_clear);
 
     printf("All tests passed!\n");
     return 0;

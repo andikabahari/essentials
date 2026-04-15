@@ -1,3 +1,74 @@
+// Scope-based defer
+
+TEST(test_defer_basic) {
+    int x = 0;
+
+    {
+        defer(x = 1);
+    }
+
+    ASSERT(x == 1);
+}
+
+TEST(test_defer_lifo) {
+    int x = 0;
+
+    {
+        defer(x = x * 10 + 1); // last
+        defer(x = x * 10 + 2);
+        defer(x = x * 10 + 3); // first
+    }
+
+    ASSERT(x == 321);
+}
+
+TEST(test_defer_nested) {
+    int x = 0;
+
+    {
+        defer(x += 1);
+
+        {
+            defer(x += 2);
+        }
+
+        ASSERT(x == 2);
+    }
+
+    ASSERT(x == 3);
+}
+
+internal int defer_return_inner() {
+    int x = 0;
+
+    {
+        defer(x = 42);
+        return x;
+    }
+}
+
+TEST(test_defer_return) {
+    int r = defer_return_inner();
+    ASSERT(r == 0);
+}
+
+global_var bool freed = false;
+
+internal void fake_free(void *) {
+    freed = true;
+}
+
+TEST(test_defer_resource) {
+    freed = false;
+
+    {
+        void* ptr = (void *)1234;
+        defer(fake_free(ptr));
+    }
+
+    ASSERT(freed == true);
+}
+
 // Arena
 
 TEST(test_arena_push_one) {
@@ -911,73 +982,17 @@ TEST(test_table_stress_string) {
     arena_destroy(arena);
 }
 
-// Scope-based defer
-
-TEST(test_defer_basic) {
-    int x = 0;
-
+TEST(test_table_clear) {
+    Table<u64, int> t;
     {
-        defer(x = 1);
+        table_init(&t, 8);
+        defer(table_clear(&t));
+
+        table_set(&t, (u64)1, 10);
+        table_set(&t, (u64)2, 20);
     }
 
-    ASSERT(x == 1);
-}
-
-TEST(test_defer_lifo) {
-    int x = 0;
-
-    {
-        defer(x = x * 10 + 1); // last
-        defer(x = x * 10 + 2);
-        defer(x = x * 10 + 3); // first
-    }
-
-    ASSERT(x == 321);
-}
-
-TEST(test_defer_nested) {
-    int x = 0;
-
-    {
-        defer(x += 1);
-
-        {
-            defer(x += 2);
-        }
-
-        ASSERT(x == 2);
-    }
-
-    ASSERT(x == 3);
-}
-
-internal int defer_return_inner() {
-    int x = 0;
-
-    {
-        defer(x = 42);
-        return x;
-    }
-}
-
-TEST(test_defer_return) {
-    int r = defer_return_inner();
-    ASSERT(r == 0);
-}
-
-global_var bool freed = false;
-
-internal void fake_free(void *) {
-    freed = true;
-}
-
-TEST(test_defer_resource) {
-    freed = false;
-
-    {
-        void* ptr = (void *)1234;
-        defer(fake_free(ptr));
-    }
-
-    ASSERT(freed == true);
+    ASSERT(t.len == 0);
+    ASSERT(table_get(&t, (u64)1) == NULL);
+    ASSERT(table_get(&t, (u64)2) == NULL);
 }
