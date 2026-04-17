@@ -5,6 +5,7 @@ base.*
 !base.h
 
 gfx.*
+!gfx.h
 !gfx.vert
 !gfx.vert.spv
 !gfx.frag
@@ -12,4 +13,4 @@ gfx.*
 
 test_all.*
 
-./SDL3.dll
+/SDL3.dll
