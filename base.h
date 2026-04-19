@@ -245,7 +245,7 @@ struct gbprivDefer {
 };
 template <typename F> gbprivDefer<F> gb__defer_func(F &&f) { return gbprivDefer<F>(gb_forward<F>(f)); }
 
-#define defer(code) auto CONCAT(x, __LINE__) = gb__defer_func([&]()->void{code;})
+#define defer(code) auto CONCAT(defer_, __LINE__) = gb__defer_func([&]()->void{code;})
 
 // Memory
 
