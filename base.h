@@ -1,20 +1,137 @@
+//
+// base.h
+//
+// This is a public domain C++ library.
+// No warranty implied, use at your own risk!
+//
+// This library contains things that I wish C provided by default.
+// Those things are basic data structures (arrays, strings, hash tables).
+// The first time I tried C, I liked how simple it is. It's so simple
+// that it tastes bland and raw, so I want to add some flavors to
+// satisfy my tongue.
+//
+// You can find most of the things this library has in the C++
+// standard template library (STL). But if you're just like me, if you
+// want to use C with a little bit of flavors--templates,
+// overloading--if you want to keep everything explicit init-and-free
+// (no RAII), maybe this library will be helpful for you (hopefully).
+//
+//
+// IMPORTANT
+//
+// Do this:
+//
+//   #define BASE_IMPLEMENTATION
+//
+// in ONE C++ file before including this library.
+//
+// It should look like this:
+//
+//   #define BASE_IMPLEMENTATION
+//   #include "base.h"
+//
+// All the things will have "static" modifier. If you dont want that,
+// for example, you want to make this libary as a precompiled header,
+// you can this:
+//
+//   #define BASE_STATIC
+//   #define BASE_IMPLEMENTATION
+//   #include "base.h"
+//
+//
+// EXAMPLE USAGE
+//
+//   Arenas
+//
+//     Create an arena with reserve size of n bytes and commit size of m bytes:
+//       Arena *arena = arena_create(n, m);
+//
+//     Push n bytes onto the arena:
+//       void *ptr = arena_push(arena, n);
+//
+//     Push one sizeof(T) bytes onto the arena:
+//       void *ptr = PUSH_ONE(arena, T);
+//
+//     Push n sizeof(T) bytes onto the arena:
+//       void *ptr = PUSH_MANY(arena, T, n);
+//
+//     Clear the arena:
+//       arena_clear(arena);
+//
+//     Destroy the arena:
+//       arena_destroy(arena);
+//
+//     Per-thread scratch arena for temporary allocation:
+//       Temp_Arena temp = acquire_scratch_arena();
+//       PUSH_MANY(temp.arena, u8, 100);
+//       release_scratch_arena(temp);
+//
+//   Arrays
+//
+//     Init an array of integers:
+//       Array<int> nums;
+//       array_init(&nums);
+//
+//     Add items to the array:
+//       array_add(&nums, 1);
+//       array_add(&nums, 2);
+//       array_add(&nums, 3);
+//
+//     Access the i'th item in the array:
+//       nums[i]
+//
+//     Get length of the array:
+//       nums.len
+//
+//     Get capacity of the array:
+//       nums.cap
+//
+//     Free the array:
+//       array_free(&nums);
+//
+//   Strings
+//
+//     Make a string with LIT(s):
+//       String text = LIT("Foo");
+//
+//     Access the i'th byte in the string:
+//       text[i]
+//
+//     Get length of the string:
+//       text.len
+//
+//     Compare two strings:
+//       text == "Foo"
+//       text == LIT("Foo")
+//
+//     Printf-style arguments:
+//       printf("%.*s", FMT(text));
+//
+//     Concatenate two strings (needs arena for allocation):
+//       String new_text = string_concat(arena, text, LIT("Bar"));
+//
+//     Convert to C string (needs arena for allocation):
+//       const char *cstr = string_to_cstr(arena, text);
+//
+//   Hash Tables
+//
+//     Init a hash table of type Table<String, int>:
+//       Table<String, int> height;
+//       table_init(&height);
+//
+//     Set an item to the hash table:
+//       table_set(&height, LIT("Asep"), 192);
+//       table_set(&height, LIT("Udin"), 210);
+//
+//     Get an item from the hash table:
+//       int *x = table_get(&height, LIT("Asep"));
+//
+//     Free the table:
+//       table_free(&height);
+// 
+
 #ifndef BASE_H
 #define BASE_H
-
-/*
-
-Critical rules:
-   1. Templates
-      - Always in header
-      - Never inside `#ifdef BASE_IMPLEMENTATION`
-   2. Non-template functions
-      - Declaration in header
-      - Definition ONLY inside `#ifdef BASE_IMPLEMENTATION`
-   3. Exactly ONE implementation:
-      - One C/C++ file with `#define BASE_IMPLEMENTATION`
-      - OR compile this file into `.lib`
-
-*/
 
 //
 // DECLARATION
@@ -30,9 +147,9 @@ Critical rules:
     #define IDEF static
 #endif
 
-#define local_persist static
-#define internal static
-#define global_var static
+#define local_persist static // Local persisting variable
+#define internal      static // Internal linkage
+#define global_var    static // Global variable
 
 // Packs 4 chars into a u32, useful for file format magic numbers/tags.
 // Example: u32 png_tag = FOURCC('P','N','G',' ');
@@ -366,18 +483,6 @@ void array_unordered_remove(Array<T> *arr, isize index);
 
 // Strings
 
-/*
-
-Notes:
-    String -> non-owning view
-    String_Buffer -> owning, mutable
-    Slice / view -> no alloc
-    Concat / join -> alloc in arena
-    Split -> alloc array + substring (views or copies)
-    String doesn't store null character
-
-*/
-
 struct String {
     u8 *data;
     isize len;
@@ -425,13 +530,16 @@ template <isize N> inline bool operator >= (const String &a, const char (&b)[N])
 template <> inline bool operator == (const String &a, const char (&b)[1]);
 template <> inline bool operator != (const String &a, const char (&b)[1]);
 
-// Utils
-inline u8 to_lower(u8 c);
-inline u8 to_upper(u8 c);
-inline bool is_alpha(u8 c);
-inline bool is_digit(u8 c);
-inline bool is_space(u8 c);
+// Byte utils
+inline bool byte_is_lower(u8 c);
+inline bool byte_is_upper(u8 c);
+inline bool byte_is_alpha(u8 c);
+inline bool byte_is_digit(u8 c);
+inline bool byte_is_alnum(u8 c);
+inline bool byte_is_space(u8 c);
 inline bool byte_in_set(u8 c, const String &strset);
+inline u8 byte_to_lower(u8 c);
+inline u8 byte_to_upper(u8 c);
 
 // Non-allocating
 IDEF i32 string_compare(const String &a, const String &b);
@@ -462,13 +570,6 @@ IDEF Array<String> string_split(Arena *arena, const String &s, const String &sep
 IDEF String string_replace(Arena *arena, const String &s, const String &oldstr, const String &newstr);
 
 // Hash tables
-
-//
-// I'm still wondering whether to make string to be owning or non-owning,
-// whether to use Robin Hood probing, and whether should I use
-// `index = hash % cap` or `index = hash & (cap - 1)`
-//  where `cap` is a power-of-2 number.
-//
 
 enum {
     TABLE_SLOT_EMPTY,
@@ -524,7 +625,7 @@ template <typename K, typename V>
 void table_clear(Table<K, V> *t);
 
 //
-// DEFINITION
+// IMPLEMENTATION
 //
 
 #include <stdlib.h>
@@ -917,25 +1018,27 @@ template <isize N> inline bool operator >= (const String &a, const char (&b)[N])
 template <> inline bool operator == (const String &a, const char (&b)[1]) { return a.len == 0; }
 template <> inline bool operator != (const String &a, const char (&b)[1]) { return a.len != 0; }
 
-inline u8 to_lower(u8 c) {
-    if (c >= 'A' && c <= 'Z') return c + 32;
-    return c;
+inline bool byte_is_lower(u8 c) {
+    return 'a' <= c && c <= 'z';
 }
 
-inline u8 to_upper(u8 c) {
-    if (c >= 'a' && c <= 'z') return c - 32;
-    return c;
+inline bool byte_is_upper(u8 c) {
+    return 'A' <= c && c <= 'Z';
 }
 
-inline bool is_alpha(u8 c) {
-    return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
+inline bool byte_is_alpha(u8 c) {
+    return byte_is_lower(c) || byte_is_upper(c);
 }
 
-inline bool is_digit(u8 c) {
+inline bool byte_is_digit(u8 c) {
     return '0' <= c && c <= '9';
 }
 
-inline bool is_space(u8 c) {
+inline bool byte_is_alnum(u8 c) {
+    return byte_is_alpha(c) || byte_is_digit(c);
+}
+
+inline bool byte_is_space(u8 c) {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
@@ -944,6 +1047,14 @@ inline bool byte_in_set(u8 c, const String &strset) {
         if (strset.data[i] == c) return true;
     }
     return false;
+}
+
+inline u8 byte_to_lower(u8 c) {
+    return byte_is_upper(c) ? c + 32 : c;
+}
+
+inline u8 byte_to_upper(u8 c) {
+    return byte_is_lower(c) ? c - 32 : c;
 }
 
 #ifdef BASE_IMPLEMENTATION
@@ -1043,10 +1154,10 @@ IDEF String string_trim_right(const String &s, const String &cutset) {
 
 IDEF String string_trim_space(const String &s) {
     isize start = 0;
-    while (start < s.len && is_space(s.data[start])) start++;
+    while (start < s.len && byte_is_space(s.data[start])) start++;
 
     isize end = s.len;
-    while (end > start && is_space(s.data[end - 1])) end--;
+    while (end > start && byte_is_space(s.data[end - 1])) end--;
 
     return string_make(s.data + start, end - start);
 }
@@ -1071,13 +1182,13 @@ IDEF String string_trim_suffix(const String &s, const String &suffix) {
 
 IDEF String string_to_lower(Arena *arena, const String &s) {
     u8 *data = PUSH_MANY(arena, u8, s.len);
-    for (isize i = 0; i < s.len; i++) data[i] = to_lower(s.data[i]);
+    for (isize i = 0; i < s.len; i++) data[i] = byte_to_lower(s.data[i]);
     return string_make(data, s.len);
 }
 
 IDEF String string_to_upper(Arena *arena, const String &s) {
     u8 *data = PUSH_MANY(arena, u8, s.len);
-    for (isize i = 0; i < s.len; i++) data[i] = to_upper(s.data[i]);
+    for (isize i = 0; i < s.len; i++) data[i] = byte_to_upper(s.data[i]);
     return string_make(data, s.len);
 }
 
@@ -1163,11 +1274,10 @@ IDEF Array<String> string_split(Arena *arena, const String &s, const String &sep
     return result;
 }
 
-IDEF String string_replace(
-                Arena *arena,
-                const String &s,
-                const String &oldstr,
-                const String &newstr) {
+IDEF String string_replace(Arena *arena,
+                           const String &s,
+                           const String &oldstr,
+                           const String &newstr) {
     if (oldstr.len == 0) return s;
 
     // count occurrences

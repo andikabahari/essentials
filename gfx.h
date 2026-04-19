@@ -86,7 +86,7 @@ IDEF SDL_GPUShader *gfx_load_shader(const String &file) {
         String parsed_num = string_empty();
         char parsed_char = 0;
         for (isize j = 0; j < hint.len; j++) {
-            if (is_digit(hint[j])) {
+            if (byte_is_digit(hint[j])) {
                 parsed_num = string_make(hint.data, j + 1);
             } else {
                 parsed_char = hint[j];
