@@ -30,8 +30,8 @@ if %opt_debug%==1 set lflags=/DEBUG
 
 :: Compile
 
-set dir_includes=/I SDL3\include
-set dir_libs=/LIBPATH:SDL3\lib\x64
+set dir_includes=/I SDL\include
+set dir_libs=/LIBPATH:SDL\lib\x64
 
 set cl_base=
 set base_obj=
@@ -71,7 +71,7 @@ echo.
 
 :: Test!
 
-copy SDL3\lib\x64\SDL3.dll SDL3.dll >nul 2>&1
+copy SDL\lib\x64\SDL3.dll SDL3.dll >nul 2>&1
 if exist %test_exe% call %test_exe%
 
 echo Done.

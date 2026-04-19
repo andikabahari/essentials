@@ -6,10 +6,6 @@
 
 /gfx.*
 !/gfx.h
-!/gfx.vert
-!/gfx.vert.spv
-!/gfx.frag
-!/gfx.frag.spv
 
 /test_all.*
 !/test_all.cpp

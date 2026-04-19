@@ -234,7 +234,7 @@ IDEF void end_temp_arena(Temp_Arena temp);
 
 extern THREAD_LOCAL Arena *scratch_pool[SCRATCH_POOL];
 
-IDEF Temp_Arena acquire_scratch_arena(Arena **conflicts, i32 num_conflicts);
+IDEF Temp_Arena acquire_scratch_arena(Arena **conflicts = NULL, i32 num_conflicts = 0);
 IDEF void release_scratch_arena(Temp_Arena scratch);
 
 // Arrays
@@ -358,6 +358,8 @@ template <> inline bool operator != (const String &a, const char (&b)[1]);
 // Utils
 inline u8 to_lower(u8 c);
 inline u8 to_upper(u8 c);
+inline bool is_alpha(u8 c);
+inline bool is_digit(u8 c);
 inline bool is_space(u8 c);
 inline bool byte_in_set(u8 c, const String &strset);
 
@@ -853,6 +855,14 @@ inline u8 to_lower(u8 c) {
 inline u8 to_upper(u8 c) {
     if (c >= 'a' && c <= 'z') return c - 32;
     return c;
+}
+
+inline bool is_alpha(u8 c) {
+    return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
+}
+
+inline bool is_digit(u8 c) {
+    return '0' <= c && c <= '9';
 }
 
 inline bool is_space(u8 c) {

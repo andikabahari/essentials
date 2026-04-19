@@ -19,6 +19,8 @@ extern SDL_GPUGraphicsPipeline *gfx_pipeline;
 
 #define GFX_SHADER_FORMAT (SDL_GPU_SHADERFORMAT_SPIRV)
 
+IDEF SDL_GPUShader *gfx_load_shader(const String &file);
+
 IDEF bool gfx_init(SDL_Window *window);
 IDEF void gfx_quit();
 IDEF void gfx_draw();
@@ -33,6 +35,96 @@ bool gfx_initted = false;
 SDL_Window *gfx_window = NULL;
 SDL_GPUDevice *gfx_device = NULL;
 SDL_GPUGraphicsPipeline *gfx_pipeline = NULL;
+
+//
+// Load shader from a file with this name format: <name>.<stage>.<optionals>.<extension>
+//
+// Examples:
+//     example.vert.spv
+//     example.vert.1s.2t.0b.2u.spv
+//     example.frag.spv
+//
+// I think putting hints on the file name is simpler and more practical than
+// using a sidecar file to store shader metadata. Those hints are:
+//     - Shader format, indicated by file extension
+//     - Shader stage, indicated by "vert" or "frag"
+//     - Samplers, e.g. "1s"
+//     - Storage textures, e.g. "2t"
+//     - Storage buffers, e.g. "0b"
+//     - Uniform buffers, e.g. "1u"
+//
+IDEF SDL_GPUShader *gfx_load_shader(const String &file) {
+    auto s = acquire_scratch_arena();
+    defer(release_scratch_arena(s));
+
+    Array<String> parts = string_split(s.arena, file, LIT("."));
+    if (parts.len < 3) return NULL;
+
+    String parsed_name      = parts[0];
+    String parsed_stage     = parts[1];
+    String parsed_extension = parts[parts.len - 1];
+
+    SDL_GPUShaderFormat format;
+    const char *entry;
+    if      (parsed_extension == "spv")  { format = SDL_GPU_SHADERFORMAT_SPIRV; entry = "main";  }
+    else if (parsed_extension == "dxil") { format = SDL_GPU_SHADERFORMAT_DXIL;  entry = "main";  }
+    else if (parsed_extension == "msl")  { format = SDL_GPU_SHADERFORMAT_MSL;   entry = "main0"; }
+    else return NULL;
+
+    SDL_GPUShaderStage stage;
+    if      (parsed_stage == "vert") stage = SDL_GPU_SHADERSTAGE_VERTEX;
+    else if (parsed_stage == "frag") stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+    else return NULL;
+
+    i32 num_samplers    = 0;
+    i32 num_storage_tex = 0;
+    i32 num_storage_buf = 0;
+    i32 num_uniform_buf = 0;
+    for (isize i = 2; i < parts.len - 1; i++) {
+        String hint = parts[i];
+
+        String parsed_num = string_empty();
+        char parsed_char = 0;
+        for (isize j = 0; j < hint.len; j++) {
+            if (is_digit(hint[j])) {
+                parsed_num = string_make(hint.data, j + 1);
+            } else {
+                parsed_char = hint[j];
+                break;
+            }
+        }
+
+        i32 num = 0;
+        for (isize j = 0; j < parsed_num.len; j++) {
+            num *= 10;
+            num += parsed_num[j] - '0';
+        }
+        switch (parsed_char) {
+            case 's': num_samplers    = num; break;
+            case 't': num_storage_tex = num; break;
+            case 'b': num_storage_buf = num; break;
+            case 'u': num_uniform_buf = num; break;
+        }
+    }
+
+    isize code_size;
+    void *code = SDL_LoadFile(string_to_cstr(s.arena, file), (size_t *)&code_size);
+    if (!code) return NULL;
+    defer(SDL_free(code));
+
+    SDL_GPUShaderCreateInfo info = {};
+    info.code_size  = code_size;
+    info.code       = (u8 *)code;
+    info.entrypoint = entry;
+    info.format     = format;
+    info.stage      = stage;
+    info.num_samplers         = num_samplers;
+    info.num_storage_textures = num_storage_tex;
+    info.num_storage_buffers  = num_storage_buf;
+    info.num_uniform_buffers  = num_uniform_buf;
+
+    return SDL_CreateGPUShader(gfx_device, &info);
+}
 
 IDEF bool gfx_init(SDL_Window *window) {
     gfx_window = window;
@@ -49,38 +141,10 @@ IDEF bool gfx_init(SDL_Window *window) {
     }
 
     /* Init graphics pipeline */ {
-        isize vert_code_size;
-        auto vert_code = SDL_LoadFile("gfx.vert.spv", (size_t *)&vert_code_size);
-        defer(SDL_free(vert_code));
-
-        SDL_GPUShaderCreateInfo vert_info = {};
-        vert_info.code_size    = vert_code_size;
-        vert_info.code         = (u8 *)vert_code;
-        vert_info.entrypoint   = "main";
-        vert_info.format       = SDL_GPU_SHADERFORMAT_SPIRV;
-        vert_info.stage        = SDL_GPU_SHADERSTAGE_VERTEX;
-        vert_info.num_samplers = 0;
-        vert_info.num_storage_textures = 0;
-        vert_info.num_storage_buffers  = 0;
-        vert_info.num_uniform_buffers  = 0;
-        auto vert_shader = SDL_CreateGPUShader(gfx_device, &vert_info);
+        auto vert_shader = gfx_load_shader(LIT("shader/gfx.vert.spv"));
         defer(SDL_ReleaseGPUShader(gfx_device, vert_shader));
 
-        isize frag_code_size;
-        auto frag_code = SDL_LoadFile("gfx.frag.spv", (size_t *)&frag_code_size);
-        defer(SDL_free(frag_code));
-
-        SDL_GPUShaderCreateInfo frag_info = {};
-        frag_info.code_size    = frag_code_size;
-        frag_info.code         = (u8 *)frag_code;
-        frag_info.entrypoint   = "main";
-        frag_info.format       = SDL_GPU_SHADERFORMAT_SPIRV;
-        frag_info.stage        = SDL_GPU_SHADERSTAGE_FRAGMENT;
-        frag_info.num_samplers = 0;
-        frag_info.num_storage_textures = 0;
-        frag_info.num_storage_buffers  = 0;
-        frag_info.num_uniform_buffers  = 0;
-        auto frag_shader = SDL_CreateGPUShader(gfx_device, &frag_info);
+        auto frag_shader = gfx_load_shader(LIT("shader/gfx.frag.spv"));
         defer(SDL_ReleaseGPUShader(gfx_device, frag_shader));
 
         SDL_GPUColorTargetDescription color_desc = {};
