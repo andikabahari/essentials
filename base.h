@@ -34,105 +34,12 @@ Critical rules:
 #define internal static
 #define global_var static
 
-// Compiler detection
+// Packs 4 chars into a u32, useful for file format magic numbers/tags.
+// Example: u32 png_tag = FOURCC('P','N','G',' ');
+#define FOURCC(a, b, c, d)\
+    ((u32)(a) | ((u32)(b) << 8) | ((u32)(c) << 16) | ((u32)(d) << 24))
 
-#if defined(_MSC_VER)
-    #define COMPILER_MSVC 1
-#else
-    #define COMPILER_MSVC 0
-#endif
-
-#if defined(__clang__)
-    #define COMPILER_CLANG 1
-#else
-    #define COMPILER_CLANG 0
-#endif
-
-#if defined(__GNUC__) && !COMPILER_CLANG
-    #define COMPILER_GCC 1
-#else
-    #define COMPILER_GCC 0
-#endif
-
-// Thread local
-
-#if COMPILER_MSVC
-    #define THREAD_LOCAL __declspec(thread)
-#elif COMPILER_CLANG || COMPILER_GCC
-    #define THREAD_LOCAL __thread
-#else
-    #error "No thread-local storage support for this compiler"
-#endif
-
-// Basic types
-
-#include <stdint.h>
-#include <stddef.h>
-#include <stdbool.h>
-
-typedef uint8_t u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-
-typedef int8_t i8;
-typedef int16_t i16;
-typedef int32_t i32;
-typedef int64_t i64;
-
-typedef float f32;
-typedef double f64;
-
-typedef size_t usize;
-typedef ptrdiff_t isize;
-
-#define U8_MAX  0xFF
-#define U16_MAX 0xFFFF
-#define U32_MAX 0xFFFFFFFFu
-#define U64_MAX 0xFFFFFFFFFFFFFFFFull
-
-// Macro utils
-
-#define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
-
-#define KiB(n) ((u64)(n) << 10)
-#define MiB(n) ((u64)(n) << 20)
-#define GiB(n) ((u64)(n) << 30)
-
-#define ALIGN_UP(x, a) (((x) + ((a)-1)) & ~((a)-1))
-#define ALIGN_DOWN(x, a) ((x) & ~((a)-1))
-
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-#define MAX(a,b) ((a) > (b) ? (a) : (b))
-#define CLAMP(x, lo, hi) (MAX((lo), MIN((x), (hi))))
-
-// Asserts
-
-#if COMPILER_MSVC
-    #define DEBUG_BREAK() __debugbreak()
-#else
-    #define DEBUG_BREAK() __builtin_trap()
-#endif
-
-#ifndef NDEBUG
-    #define ASSERT(x) do { if (!(x)) DEBUG_BREAK(); } while(0)
-#else
-    #define ASSERT(x)
-#endif
-
-#define STATIC_ASSERT(cond, msg) static_assert(cond, msg)
-
-STATIC_ASSERT(sizeof(i8)  == 1, "i8 size incorrect");
-STATIC_ASSERT(sizeof(i16) == 2, "i16 size incorrect");
-STATIC_ASSERT(sizeof(i32) == 4, "i32 size incorrect");
-STATIC_ASSERT(sizeof(i64) == 8, "i64 size incorrect");
-
-STATIC_ASSERT(sizeof(u8)  == 1, "u8 size incorrect");
-STATIC_ASSERT(sizeof(u16) == 2, "u16 size incorrect");
-STATIC_ASSERT(sizeof(u32) == 4, "u32 size incorrect");
-STATIC_ASSERT(sizeof(u64) == 8, "u64 size incorrect");
-
-// Platform detection
+// OS detection
 
 #if defined(_WIN32) || defined(_WIN64)
     #define OS_WINDOWS 1
@@ -156,6 +63,170 @@ STATIC_ASSERT(sizeof(u64) == 8, "u64 size incorrect");
     #error "Unsupported OS"
 #endif
 
+// Compiler detection
+
+#if defined(_MSC_VER)
+    #define COMPILER_MSVC 1
+#else
+    #define COMPILER_MSVC 0
+#endif
+
+#if defined(__clang__)
+    #define COMPILER_CLANG 1
+#else
+    #define COMPILER_CLANG 0
+#endif
+
+#if defined(__GNUC__) && !COMPILER_CLANG
+    #define COMPILER_GCC 1
+#else
+    #define COMPILER_GCC 0
+#endif
+
+// Compiler hints
+
+#if COMPILER_MSVC
+    #define FORCE_INLINE    __forceinline
+    #define NO_INLINE       __declspec(noinline)
+    #define LIKELY(x)       (x)
+    #define UNLIKELY(x)     (x)
+#elif COMPILER_CLANG || COMPILER_GCC
+    #define FORCE_INLINE    __attribute__((always_inline)) inline
+    #define NO_INLINE       __attribute__((noinline))
+    #define LIKELY(x)       __builtin_expect(!!(x), 1)
+    #define UNLIKELY(x)     __builtin_expect(!!(x), 0)
+#else
+    #define FORCE_INLINE    inline
+    #define NO_INLINE
+    #define LIKELY(x)       (x)
+    #define UNLIKELY(x)     (x)
+#endif
+
+#define UNUSED(x)       ((void)(x))
+#define FALLTHROUGH     [[fallthrough]]
+#define DEPRECATED(msg) [[deprecated(msg)]]
+
+// Example: struct PACKED MyStruct { ... };
+#if COMPILER_MSVC
+    #define PACKED __pragma(pack(push, 1)) /* struct */ __pragma(pack(pop))
+#elif COMPILER_CLANG || COMPILER_GCC
+    #define PACKED __attribute__((packed))
+#endif
+
+#if COMPILER_MSVC
+    #define THREAD_LOCAL __declspec(thread)
+#elif COMPILER_CLANG || COMPILER_GCC
+    #define THREAD_LOCAL __thread
+#else
+    #error "No thread-local storage support for this compiler"
+#endif
+
+// Basic types
+
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+
+typedef uint8_t  u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
+
+typedef int8_t  i8;
+typedef int16_t i16;
+typedef int32_t i32;
+typedef int64_t i64;
+
+typedef float  f32;
+typedef double f64;
+
+typedef size_t usize;
+typedef ptrdiff_t isize;
+
+#define U8_MAX  0xFF
+#define U16_MAX 0xFFFF
+#define U32_MAX 0xFFFFFFFFu
+#define U64_MAX 0xFFFFFFFFFFFFFFFFull
+
+#define I8_MIN  ((i8) 0x80)
+#define I8_MAX  ((i8) 0x7F)
+#define I16_MIN ((i16)0x8000)
+#define I16_MAX ((i16)0x7FFF)
+#define I32_MIN ((i32)0x80000000)
+#define I32_MAX ((i32)0x7FFFFFFF)
+#define I64_MIN ((i64)0x8000000000000000)
+#define I64_MAX ((i64)0x7FFFFFFFFFFFFFFF)
+
+#define F32_MIN     (1.17549435e-38f)
+#define F32_MAX     (3.40282347e+38f)
+#define F32_EPSILON (1.19209290e-07f)
+#define F64_MIN     (2.2250738585072014e-308)
+#define F64_MAX     (1.7976931348623157e+308)
+#define F64_EPSILON (2.2204460492503131e-16)
+
+// Bit manipulation
+
+#define BIT(n)            (1ULL << (n))
+#define BIT_SET(x, n)     ((x) |=  BIT(n))
+#define BIT_CLEAR(x, n)   ((x) &= ~BIT(n))
+#define BIT_TOGGLE(x, n)  ((x) ^=  BIT(n))
+#define BIT_CHECK(x, n)   (((x) >> (n)) & 1)
+
+#define KiB(n) ((u64)(n) << 10)
+#define MiB(n) ((u64)(n) << 20)
+#define GiB(n) ((u64)(n) << 30)
+
+// Math helpers
+
+#define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
+
+#define ALIGN_UP(x, a) (((x) + ((a)-1)) & ~((a)-1))
+#define ALIGN_DOWN(x, a) ((x) & ~((a)-1))
+
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+#define CLAMP(x, lo, hi) (MAX((lo), MIN((x), (hi))))
+
+#define ABS(x)        ((x) < 0 ? -(x) : (x))
+#define SIGN(x)       ((x) > 0 ? 1 : ((x) < 0 ? -1 : 0))
+#define SQUARE(x)     ((x) * (x))
+#define IS_POW2(x)    ((x) != 0 && ((x) & ((x) - 1)) == 0)
+#define LERP(a, b, t) ((a) + ((b) - (a)) * (t))
+
+// Asserts
+
+#if COMPILER_MSVC
+    #define DEBUG_BREAK() __debugbreak()
+#else
+    #define DEBUG_BREAK() __builtin_trap()
+#endif
+
+#ifndef _DEBUG
+    #define ASSERT(x) do { if (!(x)) DEBUG_BREAK(); } while(0)
+#else
+    #define ASSERT(x)
+#endif
+
+#define STATIC_ASSERT(cond, msg) static_assert(cond, msg)
+
+STATIC_ASSERT(sizeof(i8)  == 1, "i8 size incorrect");
+STATIC_ASSERT(sizeof(i16) == 2, "i16 size incorrect");
+STATIC_ASSERT(sizeof(i32) == 4, "i32 size incorrect");
+STATIC_ASSERT(sizeof(i64) == 8, "i64 size incorrect");
+
+STATIC_ASSERT(sizeof(u8)  == 1, "u8 size incorrect");
+STATIC_ASSERT(sizeof(u16) == 2, "u16 size incorrect");
+STATIC_ASSERT(sizeof(u32) == 4, "u32 size incorrect");
+STATIC_ASSERT(sizeof(u64) == 8, "u64 size incorrect");
+
+// Stringify / concat
+
+#define STRINGIFY_INNER(x) #x
+#define STRINGIFY(x)       STRINGIFY_INNER(x)
+
+#define CONCAT_INNER(a, b) a##b
+#define CONCAT(a, b)       CONCAT_INNER(a, b)
+
 // Scope-based defer
 // From: https://github.com/gingerBill/gb/blob/master/gb.h
 
@@ -174,12 +245,11 @@ struct gbprivDefer {
 };
 template <typename F> gbprivDefer<F> gb__defer_func(F &&f) { return gbprivDefer<F>(gb_forward<F>(f)); }
 
-#define GB_DEFER_1(x, y) x##y
-#define GB_DEFER_2(x, y) GB_DEFER_1(x, y)
-#define GB_DEFER_3(x)    GB_DEFER_2(x, __COUNTER__)
-#define defer(code)      auto GB_DEFER_3(_defer_) = gb__defer_func([&]()->void{code;})
+#define defer(code) auto CONCAT(x, __LINE__) = gb__defer_func([&]()->void{code;})
 
 // Memory
+
+#define SWAP(T, a, b) do { T _swap_tmp_ = (a); (a) = (b); (b) = _swap_tmp_; } while(0)
 
 inline void *mem_alloc(isize size);
 inline void *mem_realloc(void *ptr, isize new_size);
