@@ -110,13 +110,21 @@ int main() {
     // linalg.h test cases
     //
 
-    RUN_TEST(test_linalg_vec2);
-    RUN_TEST(test_linalg_vec3);
-    RUN_TEST(test_linalg_vec4);
-    RUN_TEST(test_linalg_mat4);
-    RUN_TEST(test_linalg_mat4_inverse);
-    RUN_TEST(test_linalg_quat);
-    RUN_TEST(test_linalg_transform);
+    RUN_TEST(test_vec2);
+    RUN_TEST(test_vec3);
+    RUN_TEST(test_vec3_cross_orthogonality);
+    RUN_TEST(test_vec3_norm_idempotence);
+    RUN_TEST(test_vec4);
+    RUN_TEST(test_mat4);
+    RUN_TEST(test_mat4_inverse);
+    RUN_TEST(test_mat4_inverse2);
+    RUN_TEST(test_mat4_look_at);
+    RUN_TEST(test_mat4_perspective_sanity);
+    RUN_TEST(test_quat);
+    RUN_TEST(test_quat_norm_invariant);
+    RUN_TEST(test_quat_rotation_preserves_length);
+    RUN_TEST(test_quat_slerp_endpoints);
+    RUN_TEST(test_transform);
 
     //
     // gfx.h test cases
