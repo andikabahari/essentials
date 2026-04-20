@@ -4,6 +4,9 @@
 /base.*
 !/base.h
 
+/linalg.*
+!/linalg.h
+
 /gfx.*
 !/gfx.h
 

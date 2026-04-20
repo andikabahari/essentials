@@ -5,6 +5,9 @@
 #endif
 #include "../base.h"
 
+#ifndef LINALG_COMPILED
+    #define LINALG_IMPLEMENTATION
+#endif
 #include "../linalg.h"
 
 #pragma push_macro("internal")
@@ -25,7 +28,6 @@ internal Arena *make_arena() {
     return arena_create(MiB(16), MiB(1));
 }
 
-#include <math.h>
 
 #include "test_base.cpp"
 #include "test_linalg.cpp"
