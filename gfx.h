@@ -26,7 +26,7 @@ IDEF void gfx_quit();
 IDEF void gfx_draw();
 
 //
-// DEFINITION/IMPLEMENTATION
+// IMPLEMENTATION
 //
 
 #ifdef GFX_IMPLEMENTATION
@@ -141,7 +141,7 @@ IDEF bool gfx_init(SDL_Window *window) {
     }
 
     /* Init graphics pipeline */ {
-        auto vert_shader = gfx_load_shader(LIT("shader/gfx.vert.spv"));
+        auto vert_shader = gfx_load_shader(LIT("shader/gfx.vert.1u.spv"));
         defer(SDL_ReleaseGPUShader(gfx_device, vert_shader));
 
         auto frag_shader = gfx_load_shader(LIT("shader/gfx.frag.spv"));
@@ -172,6 +172,7 @@ IDEF void gfx_quit() {
         SDL_ReleaseWindowFromGPUDevice(gfx_device, gfx_window);
         SDL_DestroyGPUDevice(gfx_device);
     }
+    gfx_initted = false;
 }
 
 IDEF void gfx_draw() {

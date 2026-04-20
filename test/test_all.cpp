@@ -1,17 +1,19 @@
+#include <stdio.h>
+
 #ifndef BASE_COMPILED
-#define BASE_IMPLEMENTATION
+    #define BASE_IMPLEMENTATION
 #endif
 #include "../base.h"
+
+#include "../linalg.h"
 
 #pragma push_macro("internal")
 #undef internal
 
 #ifndef GFX_COMPILED
-#define GFX_IMPLEMENTATION
+    #define GFX_IMPLEMENTATION
 #endif
 #include "../gfx.h"
-
-#include <stdio.h>
 #include <SDL3/SDL.h>
 
 #pragma pop_macro("internal")
@@ -23,7 +25,10 @@ internal Arena *make_arena() {
     return arena_create(MiB(16), MiB(1));
 }
 
+#include <math.h>
+
 #include "test_base.cpp"
+#include "test_linalg.cpp"
 #include "test_gfx.cpp"
 
 int main() {
@@ -98,6 +103,18 @@ int main() {
     RUN_TEST(test_table_content_eq_string);
     RUN_TEST(test_table_stress_string);
     RUN_TEST(test_table_clear);
+
+    //
+    // linalg.h test cases
+    //
+
+    RUN_TEST(test_linalg_vec2);
+    RUN_TEST(test_linalg_vec3);
+    RUN_TEST(test_linalg_vec4);
+    RUN_TEST(test_linalg_mat4);
+    RUN_TEST(test_linalg_mat4_inverse);
+    RUN_TEST(test_linalg_quat);
+    RUN_TEST(test_linalg_transform);
 
     //
     // gfx.h test cases

@@ -32,7 +32,7 @@
 //
 // All the things will have "static" modifier. If you dont want that,
 // for example, you want to make this libary as a precompiled header,
-// you can this:
+// you can do this:
 //
 //   #define BASE_STATIC
 //   #define BASE_IMPLEMENTATION
