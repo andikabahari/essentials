@@ -45,37 +45,37 @@ inline Vec3 vec3_transform_point(Mat4 m, Vec3 v) {
         rx /= rw; ry /= rw; rz /= rw;
     }
 
-    return vec3(rx, ry, rz);
+    return vec3_make(rx, ry, rz);
 }
 
 TEST(test_vec2) {
-    Vec2 a = vec2(2, 4);
-    Vec2 b = vec2(1, 2);
+    Vec2 a = vec2_make(2, 4);
+    Vec2 b = vec2_make(1, 2);
 
-    ASSERT(vec2_eq(vec2_add(a, b), vec2(3, 6)));
-    ASSERT(vec2_eq(vec2_sub(a, b), vec2(1, 2)));
-    ASSERT(vec2_eq(vec2_mul(a, b), vec2(2, 8)));
-    ASSERT(vec2_eq(vec2_div(a, b), vec2(2, 2)));
+    ASSERT(vec2_eq(vec2_add(a, b), vec2_make(3, 6)));
+    ASSERT(vec2_eq(vec2_sub(a, b), vec2_make(1, 2)));
+    ASSERT(vec2_eq(vec2_mul(a, b), vec2_make(2, 8)));
+    ASSERT(vec2_eq(vec2_div(a, b), vec2_make(2, 2)));
 
     ASSERT(feq(vec2_dot(a, b), 10.0f));
     ASSERT(feq(vec2_length_sq(a), 20.0f));
 }
 
 TEST(test_vec3) {
-    Vec3 a = vec3(1, 0, 0);
-    Vec3 b = vec3(0, 1, 0);
+    Vec3 a = vec3_make(1, 0, 0);
+    Vec3 b = vec3_make(0, 1, 0);
 
-    ASSERT(vec3_eq(vec3_cross(a, b), vec3(0, 0, 1)));
+    ASSERT(vec3_eq(vec3_cross(a, b), vec3_make(0, 0, 1)));
     ASSERT(feq(vec3_dot(a, b), 0.0f));
 
-    Vec3 c = vec3(2, 0, 0);
+    Vec3 c = vec3_make(2, 0, 0);
     ASSERT(feq(vec3_length(c), 2.0f));
-    ASSERT(vec3_eq(vec3_norm(c), vec3(1, 0, 0)));
+    ASSERT(vec3_eq(vec3_norm(c), vec3_make(1, 0, 0)));
 }
 
 TEST(test_vec3_cross_orthogonality) {
-    Vec3 a = vec3(1,2,3);
-    Vec3 b = vec3(4,5,6);
+    Vec3 a = vec3_make(1,2,3);
+    Vec3 b = vec3_make(4,5,6);
 
     Vec3 c = vec3_cross(a, b);
 
@@ -84,7 +84,7 @@ TEST(test_vec3_cross_orthogonality) {
 }
 
 TEST(test_vec3_norm_idempotence) {
-    Vec3 v = vec3(5,0,0);
+    Vec3 v = vec3_make(5,0,0);
 
     Vec3 n1 = vec3_norm(v);
     Vec3 n2 = vec3_norm(n1);
@@ -93,23 +93,23 @@ TEST(test_vec3_norm_idempotence) {
 }
 
 TEST(test_vec4) {
-    Vec4 a = vec4(2, 4, 6, 8);
-    Vec4 b = vec4(1, 2, 3, 4);
+    Vec4 a = vec4_make(2, 4, 6, 8);
+    Vec4 b = vec4_make(1, 2, 3, 4);
 
-    ASSERT(vec4_eq(vec4_mul(a, b), vec4(2, 8, 18, 32)));
-    ASSERT(vec4_eq(vec4_div(a, b), vec4(2, 2, 2, 2)));
+    ASSERT(vec4_eq(vec4_mul(a, b), vec4_make(2, 8, 18, 32)));
+    ASSERT(vec4_eq(vec4_div(a, b), vec4_make(2, 2, 2, 2)));
 
     ASSERT(feq(vec4_dot(a, b), 60.0f));
 }
 
 TEST(test_mat4) {
     Mat4 I = mat4_identity();
-    Mat4 T = mat4_translate(vec3(1,2,3));
+    Mat4 T = mat4_translate(vec3_make(1,2,3));
 
     Mat4 R = mat4_mul(I, T);
     ASSERT(mat4_eq(R, T));
 
-    Mat4 S = mat4_scale(vec3(2,2,2));
+    Mat4 S = mat4_scale(vec3_make(2,2,2));
     Mat4 M = mat4_mul(T, S);
 
     // spot check scale on diagonal
@@ -129,9 +129,9 @@ TEST(test_mat4_inverse) {
 }
 
 TEST(test_mat4_inverse2) {
-    Mat4 T = mat4_translate(vec3(3, -2, 5));
+    Mat4 T = mat4_translate(vec3_make(3, -2, 5));
     Mat4 R = mat4_rotate_y(1.2f);
-    Mat4 S = mat4_scale(vec3(2, 3, 4));
+    Mat4 S = mat4_scale(vec3_make(2, 3, 4));
 
     Mat4 M = mat4_mul(T, mat4_mul(R, S));
     Mat4 inv = mat4_inverse_affine(M);
@@ -141,13 +141,13 @@ TEST(test_mat4_inverse2) {
 }
 
 TEST(test_mat4_look_at) {
-    Vec3 eye    = vec3(0,0,0);
-    Vec3 target = vec3(0,0,-1);
-    Vec3 up     = vec3(0,1,0);
+    Vec3 eye    = vec3_make(0,0,0);
+    Vec3 target = vec3_make(0,0,-1);
+    Vec3 up     = vec3_make(0,1,0);
 
     Mat4 view = mat4_look_at(eye, target, up);
 
-    Vec3 p = vec3(0,0,-5);
+    Vec3 p = vec3_make(0,0,-5);
     Vec3 v = vec3_transform_point(view, p);
 
     ASSERT(feq(v.z, -5.0f));
@@ -156,7 +156,7 @@ TEST(test_mat4_look_at) {
 TEST(test_mat4_perspective_sanity) {
     Mat4 P = mat4_perspective(1.0f, 1.0f, 0.1f, 100.0f);
 
-    Vec3 p = vec3(0,0,-1);
+    Vec3 p = vec3_make(0,0,-1);
     Vec3 clip = vec3_transform_point(P, p);
 
     // after projection, z should be in [-1,1] range (OpenGL-style)
@@ -168,14 +168,14 @@ TEST(test_quat) {
     Mat4 m = quat_to_mat4(q);
     ASSERT(mat4_eq(m, mat4_identity()));
     
-    Quat qx = quat_from_axis_angle(vec3(1,0,0), (float)M_PI);
+    Quat qx = quat_from_axis_angle(vec3_make(1,0,0), (float)M_PI);
     Quat qn = quat_norm(qx);
     float len = sqrtf(qn.x*qn.x + qn.y*qn.y + qn.z*qn.z + qn.w*qn.w);
     ASSERT(feq(len, 1.0f));
 }
 
 TEST(test_quat_norm_invariant) {
-    Quat q = quat(1,2,3,4);
+    Quat q = quat_make(1,2,3,4);
     Quat n = quat_norm(q);
 
     float len = sqrtf(n.x*n.x + n.y*n.y + n.z*n.z + n.w*n.w);
@@ -183,10 +183,10 @@ TEST(test_quat_norm_invariant) {
 }
 
 TEST(test_quat_rotation_preserves_length) {
-    Vec3 v = vec3(1,2,3);
+    Vec3 v = vec3_make(1,2,3);
     float len0 = vec3_length(v);
 
-    Quat q = quat_from_axis_angle(vec3(0,1,0), 1.0f);
+    Quat q = quat_from_axis_angle(vec3_make(0,1,0), 1.0f);
 
     Vec3 r = vec3_rotate_quat(v, q);
     float len1 = vec3_length(r);
@@ -196,7 +196,7 @@ TEST(test_quat_rotation_preserves_length) {
 
 TEST(test_quat_slerp_endpoints) {
     Quat a = quat_identity();
-    Quat b = quat_from_axis_angle(vec3(0,1,0), M_PI);
+    Quat b = quat_from_axis_angle(vec3_make(0,1,0), M_PI);
 
     Quat r0 = quat_slerp(a, b, 0.0f);
     Quat r1 = quat_slerp(a, b, 1.0f);
@@ -206,13 +206,13 @@ TEST(test_quat_slerp_endpoints) {
 }
 
 TEST(test_transform) {
-    Transform a = transform(vec3(1,0,0),
+    Transform a = transform_make(vec3_make(1,0,0),
                             quat_identity(),
-                            vec3(1,1,1));
+                            vec3_make(1,1,1));
 
-    Transform b = transform(vec3(0,1,0),
+    Transform b = transform_make(vec3_make(0,1,0),
                             quat_identity(),
-                            vec3(1,1,1));
+                            vec3_make(1,1,1));
 
     Transform c = transform_mul(a, b);
 

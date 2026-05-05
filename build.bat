@@ -23,7 +23,7 @@ goto parse
 
 set cflags=
 if %opt_debug%==1 (set cflags=/Zi /Od /DDEBUG) else (set cflags=/O2)
-if %opt_static%==1 (set cflags=%cflags% /DBASE_STATIC /DLINALG_STATIC)
+if %opt_static%==1 (set cflags=%cflags% /DBASE_STATIC)
 
 set lflgas=
 if %opt_debug%==1 set lflags=/DEBUG

@@ -5,14 +5,10 @@
 // DECLARATION
 //
 
-#ifdef LINALG_STATIC
-    #ifdef LINALG_IMPLEMENTATION
-        #define LINALG_DEF
-    #else
-        #define LINALG_DEF extern
-    #endif
+#ifdef LINALG_IMPLEMENTATION
+    #define LINALG_DEF
 #else
-    #define LINALG_DEF static inline
+    #define LINALG_DEF extern
 #endif
 
 typedef struct { float x, y; }       Vec2;
@@ -27,7 +23,7 @@ typedef struct {
     Vec3 scale;
 } Transform;
 
-LINALG_DEF Vec2 vec2(float x, float y);
+LINALG_DEF Vec2 vec2_make(float x, float y);
 LINALG_DEF Vec2 vec2_add(Vec2 a, Vec2 b);
 LINALG_DEF Vec2 vec2_sub(Vec2 a, Vec2 b);
 LINALG_DEF Vec2 vec2_mul(Vec2 a, Vec2 b);
@@ -38,7 +34,7 @@ LINALG_DEF float vec2_length(Vec2 v);
 LINALG_DEF float vec2_length_sq(Vec2 v);
 LINALG_DEF Vec2 vec2_norm(Vec2 v);
 
-LINALG_DEF Vec3 vec3(float x, float y, float z);
+LINALG_DEF Vec3 vec3_make(float x, float y, float z);
 LINALG_DEF Vec3 vec3_add(Vec3 a, Vec3 b);
 LINALG_DEF Vec3 vec3_sub(Vec3 a, Vec3 b);
 LINALG_DEF Vec3 vec3_mul(Vec3 a, Vec3 b);
@@ -51,7 +47,7 @@ LINALG_DEF float vec3_length_sq(Vec3 v);
 LINALG_DEF Vec3 vec3_norm(Vec3 v);
 LINALG_DEF Vec3 vec3_rotate_quat(Vec3 v, Quat q);
 
-LINALG_DEF Vec4 vec4(float x, float y, float z, float w);
+LINALG_DEF Vec4 vec4_make(float x, float y, float z, float w);
 LINALG_DEF Vec4 vec4_add(Vec4 a, Vec4 b);
 LINALG_DEF Vec4 vec4_sub(Vec4 a, Vec4 b);
 LINALG_DEF Vec4 vec4_mul(Vec4 a, Vec4 b);
@@ -71,7 +67,7 @@ LINALG_DEF Mat4 mat4_scale(Vec3 s);
 LINALG_DEF Mat4 mat4_rotate_x(float rads);
 LINALG_DEF Mat4 mat4_rotate_y(float rads);
 LINALG_DEF Mat4 mat4_rotate_z(float rads);
-LINALG_DEF Mat4 mat4_from_quat(Quat q);
+LINALG_DEF Mat4 mat4_from_quat_make(Quat q);
 LINALG_DEF Mat4 mat4_look_at(Vec3 eye, Vec3 center, Vec3 up);
 LINALG_DEF Mat4 mat4_perspective(float fov_rads, float aspect, float near, float far);
 LINALG_DEF Mat4 mat4_ortho(float left, float right, float bottom, float top, float near, float far);
@@ -80,7 +76,7 @@ LINALG_DEF Mat4 mat4_inverse_affine(Mat4 m);
 
 // Quaternion multiplication order matters. This implementation uses Hamilton product,
 // where quat_mul(a, b) means apply b then a (same convention as mat4_mul).
-LINALG_DEF Quat quat(float x, float y, float z, float w);
+LINALG_DEF Quat quat_make(float x, float y, float z, float w);
 LINALG_DEF Quat quat_identity(void);
 LINALG_DEF Quat quat_mul(Quat a, Quat b);
 LINALG_DEF Quat quat_norm(Quat q);
@@ -90,7 +86,7 @@ LINALG_DEF Mat4 quat_to_mat4(Quat q);
 LINALG_DEF Quat quat_slerp(Quat a, Quat b, float t);
 
 // transform_mul(a, b) should mean apply b first, then a, matching mat4_mul and quat_mul.
-LINALG_DEF Transform transform(Vec3 pos, Quat rot, Vec3 scale);
+LINALG_DEF Transform transform_make(Vec3 pos, Quat rot, Vec3 scale);
 LINALG_DEF Mat4 transform_to_mat4(Transform t);
 LINALG_DEF Transform transform_mul(Transform a, Transform b);
 
@@ -102,7 +98,7 @@ LINALG_DEF Transform transform_mul(Transform a, Transform b);
 
 #include <math.h>
 
-LINALG_DEF Vec2 vec2(float x, float y) {
+LINALG_DEF Vec2 vec2_make(float x, float y) {
     Vec2 v;
     v.x = x;
     v.y = y;
@@ -110,23 +106,23 @@ LINALG_DEF Vec2 vec2(float x, float y) {
 }
 
 LINALG_DEF Vec2 vec2_add(Vec2 a, Vec2 b) {
-    return vec2(a.x + b.x, a.y + b.y);
+    return vec2_make(a.x + b.x, a.y + b.y);
 }
 
 LINALG_DEF Vec2 vec2_sub(Vec2 a, Vec2 b) {
-    return vec2(a.x - b.x, a.y - b.y);
+    return vec2_make(a.x - b.x, a.y - b.y);
 }
 
 LINALG_DEF Vec2 vec2_mul(Vec2 a, Vec2 b) {
-    return vec2(a.x * b.x, a.y * b.y);
+    return vec2_make(a.x * b.x, a.y * b.y);
 }
 
 LINALG_DEF Vec2 vec2_div(Vec2 a, Vec2 b) {
-    return vec2(a.x / b.x, a.y / b.y);
+    return vec2_make(a.x / b.x, a.y / b.y);
 }
 
 LINALG_DEF Vec2 vec2_scale(Vec2 v, float s) {
-    return vec2(v.x * s, v.y * s);
+    return vec2_make(v.x * s, v.y * s);
 }
 
 LINALG_DEF float vec2_dot(Vec2 a, Vec2 b) {
@@ -143,11 +139,11 @@ LINALG_DEF float vec2_length(Vec2 v) {
 
 LINALG_DEF Vec2 vec2_norm(Vec2 v) {
     float len = vec2_length(v);
-    if (len == 0.0f) return vec2(0.0f, 0.0f);
+    if (len == 0.0f) return vec2_make(0.0f, 0.0f);
     return vec2_scale(v, 1.0f / len);
 }
 
-LINALG_DEF Vec3 vec3(float x, float y, float z) {
+LINALG_DEF Vec3 vec3_make(float x, float y, float z) {
     Vec3 v;
     v.x = x;
     v.y = y;
@@ -156,23 +152,23 @@ LINALG_DEF Vec3 vec3(float x, float y, float z) {
 }
 
 LINALG_DEF Vec3 vec3_add(Vec3 a, Vec3 b) {
-    return vec3(a.x + b.x, a.y + b.y, a.z + b.z);
+    return vec3_make(a.x + b.x, a.y + b.y, a.z + b.z);
 }
 
 LINALG_DEF Vec3 vec3_sub(Vec3 a, Vec3 b) {
-    return vec3(a.x - b.x, a.y - b.y, a.z - b.z);
+    return vec3_make(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
 LINALG_DEF Vec3 vec3_mul(Vec3 a, Vec3 b) {
-    return vec3(a.x * b.x, a.y * b.y, a.z * b.z);
+    return vec3_make(a.x * b.x, a.y * b.y, a.z * b.z);
 }
 
 LINALG_DEF Vec3 vec3_div(Vec3 a, Vec3 b) {
-    return vec3(a.x / b.x, a.y / b.y, a.z / b.z);
+    return vec3_make(a.x / b.x, a.y / b.y, a.z / b.z);
 }
 
 LINALG_DEF Vec3 vec3_scale(Vec3 v, float s) {
-    return vec3(v.x * s, v.y * s, v.z * s);
+    return vec3_make(v.x * s, v.y * s, v.z * s);
 }
 
 LINALG_DEF float vec3_dot(Vec3 a, Vec3 b) {
@@ -180,7 +176,7 @@ LINALG_DEF float vec3_dot(Vec3 a, Vec3 b) {
 }
 
 LINALG_DEF Vec3 vec3_cross(Vec3 a, Vec3 b) {
-    return vec3(
+    return vec3_make(
         a.y * b.z - a.z * b.y,
         a.z * b.x - a.x * b.z,
         a.x * b.y - a.y * b.x
@@ -197,18 +193,18 @@ LINALG_DEF float vec3_length(Vec3 v) {
 
 LINALG_DEF Vec3 vec3_norm(Vec3 v) {
     float len = vec3_length(v);
-    if (len == 0.0f) return vec3(0.0f, 0.0f, 0.0f);
+    if (len == 0.0f) return vec3_make(0.0f, 0.0f, 0.0f);
     return vec3_scale(v, 1.0f / len);
 }
 
 LINALG_DEF Vec3 vec3_rotate_quat(Vec3 v, Quat q) {
-    Quat vq = quat(v.x, v.y, v.z, 0.0f);
-    Quat qi = quat(-q.x, -q.y, -q.z, q.w); // assuming normalized q
+    Quat vq = quat_make(v.x, v.y, v.z, 0.0f);
+    Quat qi = quat_make(-q.x, -q.y, -q.z, q.w); // assuming normalized q
     Quat rq = quat_mul(quat_mul(q, vq), qi);
-    return vec3(rq.x, rq.y, rq.z);
+    return vec3_make(rq.x, rq.y, rq.z);
 }
 
-LINALG_DEF Vec4 vec4(float x, float y, float z, float w) {
+LINALG_DEF Vec4 vec4_make(float x, float y, float z, float w) {
     Vec4 v;
     v.x = x;
     v.y = y;
@@ -218,23 +214,23 @@ LINALG_DEF Vec4 vec4(float x, float y, float z, float w) {
 }
 
 LINALG_DEF Vec4 vec4_add(Vec4 a, Vec4 b) {
-    return vec4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
+    return vec4_make(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
 }
 
 LINALG_DEF Vec4 vec4_sub(Vec4 a, Vec4 b) {
-    return vec4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
+    return vec4_make(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
 }
 
 LINALG_DEF Vec4 vec4_mul(Vec4 a, Vec4 b) {
-    return vec4(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
+    return vec4_make(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
 }
 
 LINALG_DEF Vec4 vec4_div(Vec4 a, Vec4 b) {
-    return vec4(a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w);
+    return vec4_make(a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w);
 }
 
 LINALG_DEF Vec4 vec4_scale(Vec4 v, float s) {
-    return vec4(v.x * s, v.y * s, v.z * s, v.w * s);
+    return vec4_make(v.x * s, v.y * s, v.z * s, v.w * s);
 }
 
 LINALG_DEF float vec4_dot(Vec4 a, Vec4 b) {
@@ -251,7 +247,7 @@ LINALG_DEF float vec4_length(Vec4 v) {
 
 LINALG_DEF Vec4 vec4_norm(Vec4 v) {
     float len = vec4_length(v);
-    if (len == 0.0f) return vec4(0.0f, 0.0f, 0.0f, 0.0f);
+    if (len == 0.0f) return vec4_make(0.0f, 0.0f, 0.0f, 0.0f);
     return vec4_scale(v, 1.0f / len);
 }
 
@@ -331,7 +327,7 @@ LINALG_DEF Mat4 mat4_rotate_z(float r) {
     return m;
 }
 
-LINALG_DEF Mat4 mat4_from_quat(Quat q) {
+LINALG_DEF Mat4 mat4_from_quat_make(Quat q) {
     float x = q.x, y = q.y, z = q.z, w = q.w;
 
     float xx = x * x;
@@ -457,8 +453,8 @@ LINALG_DEF Mat4 mat4_inverse_affine(Mat4 m) {
     r.m[15] = 1.0f;
 
     // translation
-    Vec3 t = vec3(m.m[12], m.m[13], m.m[14]);
-    Vec3 ti = vec3(
+    Vec3 t = vec3_make(m.m[12], m.m[13], m.m[14]);
+    Vec3 ti = vec3_make(
         -(r.m[0]*t.x + r.m[4]*t.y + r.m[8]*t.z),
         -(r.m[1]*t.x + r.m[5]*t.y + r.m[9]*t.z),
         -(r.m[2]*t.x + r.m[6]*t.y + r.m[10]*t.z)
@@ -471,7 +467,7 @@ LINALG_DEF Mat4 mat4_inverse_affine(Mat4 m) {
     return r;
 }
 
-LINALG_DEF Quat quat(float x, float y, float z, float w) {
+LINALG_DEF Quat quat_make(float x, float y, float z, float w) {
     Quat q;
     q.x = x;
     q.y = y;
@@ -481,11 +477,11 @@ LINALG_DEF Quat quat(float x, float y, float z, float w) {
 }
 
 LINALG_DEF Quat quat_identity(void) {
-    return quat(0.0f, 0.0f, 0.0f, 1.0f);
+    return quat_make(0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 LINALG_DEF Quat quat_mul(Quat a, Quat b) {
-    return quat(
+    return quat_make(
         a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y,
         a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x,
         a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w,
@@ -497,7 +493,7 @@ LINALG_DEF Quat quat_norm(Quat q) {
     float len = sqrtf(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w);
     if (len == 0.0f) return quat_identity();
     float inv = 1.0f / len;
-    return quat(q.x * inv, q.y * inv, q.z * inv, q.w * inv);
+    return quat_make(q.x * inv, q.y * inv, q.z * inv, q.w * inv);
 }
 
 LINALG_DEF Quat quat_from_axis_angle(Vec3 axis, float rads) {
@@ -506,7 +502,7 @@ LINALG_DEF Quat quat_from_axis_angle(Vec3 axis, float rads) {
     float s = sinf(half);
     float c = cosf(half);
 
-    return quat(n.x * s, n.y * s, n.z * s, c);
+    return quat_make(n.x * s, n.y * s, n.z * s, c);
 }
 
 // Convention (important):
@@ -523,9 +519,9 @@ LINALG_DEF Quat quat_from_euler(float pitch, float yaw, float roll) {
     float sy = sinf(hy), cy = cosf(hy);
     float sz = sinf(hz), cz = cosf(hz);
 
-    Quat qx = quat(sx, 0.0f, 0.0f, cx);
-    Quat qy = quat(0.0f, sy, 0.0f, cy);
-    Quat qz = quat(0.0f, 0.0f, sz, cz);
+    Quat qx = quat_make(sx, 0.0f, 0.0f, cx);
+    Quat qy = quat_make(0.0f, sy, 0.0f, cy);
+    Quat qz = quat_make(0.0f, 0.0f, sz, cz);
 
     return quat_mul(qz, quat_mul(qy, qx));
 }
@@ -578,7 +574,7 @@ LINALG_DEF Quat quat_slerp(Quat a, Quat b, float t) {
 
     if (dot > DOT_THRESHOLD) {
         // Use linear interpolation
-        Quat result = quat(
+        Quat result = quat_make(
             a.x + t*(b.x - a.x),
             a.y + t*(b.y - a.y),
             a.z + t*(b.z - a.z),
@@ -596,7 +592,7 @@ LINALG_DEF Quat quat_slerp(Quat a, Quat b, float t) {
     float s0 = cosf(theta) - dot * sin_theta / sin_theta_0;
     float s1 = sin_theta / sin_theta_0;
 
-    return quat(
+    return quat_make(
         (a.x * s0) + (b.x * s1),
         (a.y * s0) + (b.y * s1),
         (a.z * s0) + (b.z * s1),
@@ -604,7 +600,7 @@ LINALG_DEF Quat quat_slerp(Quat a, Quat b, float t) {
     );
 }
 
-LINALG_DEF Transform transform(Vec3 pos, Quat rot, Vec3 scale) {
+LINALG_DEF Transform transform_make(Vec3 pos, Quat rot, Vec3 scale) {
     Transform t;
     t.position = pos;
     t.rotation = rot;
@@ -614,7 +610,7 @@ LINALG_DEF Transform transform(Vec3 pos, Quat rot, Vec3 scale) {
 
 LINALG_DEF Mat4 transform_to_mat4(Transform t) {
     Mat4 T = mat4_translate(t.position);
-    Mat4 R = mat4_from_quat(t.rotation);
+    Mat4 R = mat4_from_quat_make(t.rotation);
     Mat4 S = mat4_scale(t.scale);
 
     // column-major, column vectors: M = T * R * S
