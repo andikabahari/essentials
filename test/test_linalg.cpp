@@ -61,6 +61,17 @@ TEST(test_vec2) {
     ASSERT(feq(vec2_length_sq(a), 20.0f));
 }
 
+TEST(test_vec2_ops) {
+    Vec2 a = vec2_make(2, 4);
+    Vec2 b = vec2_make(1, 2);
+
+    ASSERT(vec2_eq(a + b, vec2_make(3, 6)));
+    ASSERT(vec2_eq(a - b, vec2_make(1, 2)));
+    ASSERT(vec2_eq(a * b, vec2_make(2, 8)));
+    ASSERT(vec2_eq(a / b, vec2_make(2, 2)));
+    ASSERT(vec2_eq(a * 2, vec2_make(4, 8)));
+}
+
 TEST(test_vec3) {
     Vec3 a = vec3_make(1, 0, 0);
     Vec3 b = vec3_make(0, 1, 0);
@@ -71,6 +82,17 @@ TEST(test_vec3) {
     Vec3 c = vec3_make(2, 0, 0);
     ASSERT(feq(vec3_length(c), 2.0f));
     ASSERT(vec3_eq(vec3_norm(c), vec3_make(1, 0, 0)));
+}
+
+TEST(test_vec3_ops) {
+    Vec3 a = vec3_make(2, 4, 6);
+    Vec3 b = vec3_make(1, 2, 3);
+
+    ASSERT(vec3_eq(a + b, vec3_make(3, 6,  9)));
+    ASSERT(vec3_eq(a - b, vec3_make(1, 2,  3)));
+    ASSERT(vec3_eq(a * b, vec3_make(2, 8, 18)));
+    ASSERT(vec3_eq(a / b, vec3_make(2, 2,  2)));
+    ASSERT(vec3_eq(a * 2, vec3_make(4, 8, 12)));
 }
 
 TEST(test_vec3_cross_orthogonality) {
@@ -102,6 +124,17 @@ TEST(test_vec4) {
     ASSERT(feq(vec4_dot(a, b), 60.0f));
 }
 
+TEST(test_vec4_ops) {
+    Vec4 a = vec4_make(2, 4, 6, 8);
+    Vec4 b = vec4_make(1, 2, 3, 4);
+
+    ASSERT(vec4_eq(a + b, vec4_make(3, 6,  9, 12)));
+    ASSERT(vec4_eq(a - b, vec4_make(1, 2,  3,  4)));
+    ASSERT(vec4_eq(a * b, vec4_make(2, 8, 18, 32)));
+    ASSERT(vec4_eq(a / b, vec4_make(2, 2,  2,  2)));
+    ASSERT(vec4_eq(a * 2, vec4_make(4, 8, 12, 16)));
+}
+
 TEST(test_mat4) {
     Mat4 I = mat4_identity();
     Mat4 T = mat4_translate(vec3_make(1,2,3));
@@ -116,6 +149,14 @@ TEST(test_mat4) {
     ASSERT(feq(M.m[0], 2.0f));
     ASSERT(feq(M.m[5], 2.0f));
     ASSERT(feq(M.m[10], 2.0f));
+}
+
+TEST(test_mat4_ops) {
+    Mat4 I = mat4_identity();
+    Mat4 T = mat4_translate(vec3_make(1,2,3));
+
+    Mat4 R = I * T;
+    ASSERT(mat4_eq(R, T));
 }
 
 TEST(test_mat4_inverse) {
