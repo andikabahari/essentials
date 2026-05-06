@@ -30,14 +30,6 @@
 //   #define BASE_IMPLEMENTATION
 //   #include "base.h"
 //
-// All the things will have "static" modifier. If you dont want that,
-// for example, you want to make this libary as a precompiled header,
-// you can do this:
-//
-//   #define BASE_STATIC
-//   #define BASE_IMPLEMENTATION
-//   #include "base.h"
-//
 //
 // EXAMPLE USAGE
 //
@@ -137,24 +129,15 @@
 // DECLARATION
 //
 
-#ifdef BASE_STATIC
-    #ifdef BASE_IMPLEMENTATION
-        #define IDEF
-    #else
-        #define IDEF extern
-    #endif
+#ifdef BASE_IMPLEMENTATION
+    #define BASE_DEF
 #else
-    #define IDEF static
+    #define BASE_DEF extern
 #endif
 
 #define local_persist static // Local persisting variable
 #define internal      static // Internal linkage
 #define global_var    static // Global variable
-
-// Packs 4 chars into a u32, useful for file format magic numbers/tags.
-// Example: u32 png_tag = FOURCC('P','N','G',' ');
-#define FOURCC(a, b, c, d)\
-    ((u32)(a) | ((u32)(b) << 8) | ((u32)(c) << 16) | ((u32)(d) << 24))
 
 // OS detection
 
@@ -293,6 +276,11 @@ typedef ptrdiff_t isize;
 #define MiB(n) ((u64)(n) << 20)
 #define GiB(n) ((u64)(n) << 30)
 
+// Packs 4 chars into a u32, useful for file format magic numbers/tags.
+// Example: u32 png_tag = FOURCC('P','N','G',' ');
+#define FOURCC(a, b, c, d)\
+    ((u32)(a) | ((u32)(b) << 8) | ((u32)(c) << 16) | ((u32)(d) << 24))
+
 // Math helpers
 
 #define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
@@ -375,13 +363,13 @@ inline void mem_free(void *ptr);
 inline void mem_set(void *dest, i32 ch, isize count);
 inline i32  mem_compare(const void *a, const void *b, isize n);
 
-IDEF isize mem_page_size();
-IDEF isize mem_granularity();
+BASE_DEF isize mem_page_size();
+BASE_DEF isize mem_granularity();
 
-IDEF void *mem_reserve(isize size);
-IDEF bool mem_commit(void *ptr, isize size);
-IDEF bool mem_decommit(void *ptr, isize size);
-IDEF bool mem_release(void *ptr);
+BASE_DEF void *mem_reserve(isize size);
+BASE_DEF bool mem_commit(void *ptr, isize size);
+BASE_DEF bool mem_decommit(void *ptr, isize size);
+BASE_DEF bool mem_release(void *ptr);
 
 // Arena
 
@@ -395,12 +383,12 @@ struct Arena {
     isize commit_pos;
 };
 
-IDEF Arena *arena_create(isize reserve_size, isize commit_size);
-IDEF void arena_destroy(Arena *a);
-IDEF void *arena_push(Arena *a, isize size, bool non_zero = false);
-IDEF void arena_pop(Arena *a, isize size);
-IDEF void arena_pop_to(Arena *a, isize pos);
-IDEF void arena_clear(Arena *a);
+BASE_DEF Arena *arena_create(isize reserve_size, isize commit_size);
+BASE_DEF void arena_destroy(Arena *a);
+BASE_DEF void *arena_push(Arena *a, isize size, bool non_zero = false);
+BASE_DEF void arena_pop(Arena *a, isize size);
+BASE_DEF void arena_pop_to(Arena *a, isize pos);
+BASE_DEF void arena_clear(Arena *a);
 
 #define PUSH_ONE(a, T) (T *)arena_push((a), sizeof(T), false)
 #define PUSH_ONE_NZ(a, T) (T *)arena_push((a), sizeof(T), true)
@@ -412,8 +400,8 @@ struct Temp_Arena {
     isize start_pos;
 };
 
-IDEF Temp_Arena begin_temp_arena(Arena *a);
-IDEF void end_temp_arena(Temp_Arena temp);
+BASE_DEF Temp_Arena begin_temp_arena(Arena *a);
+BASE_DEF void end_temp_arena(Temp_Arena temp);
 
 #define SCRATCH_POOL 2
 #define SCRATCH_RESERVE_SIZE (MiB(64))
@@ -421,8 +409,8 @@ IDEF void end_temp_arena(Temp_Arena temp);
 
 extern THREAD_LOCAL Arena *scratch_pool[SCRATCH_POOL];
 
-IDEF Temp_Arena acquire_scratch_arena(Arena **conflicts = NULL, i32 num_conflicts = 0);
-IDEF void release_scratch_arena(Temp_Arena scratch);
+BASE_DEF Temp_Arena acquire_scratch_arena(Arena **conflicts = NULL, i32 num_conflicts = 0);
+BASE_DEF void release_scratch_arena(Temp_Arena scratch);
 
 // Arrays
 
@@ -542,32 +530,32 @@ inline u8 byte_to_lower(u8 c);
 inline u8 byte_to_upper(u8 c);
 
 // Non-allocating
-IDEF i32 string_compare(const String &a, const String &b);
-IDEF bool string_contains(const String &s, const String &substr);
-IDEF bool string_contains_byte(const String &s, u8 c);
-IDEF String string_cut_prefix(const String &s, const String &prefix);
-IDEF String string_cut_suffix(const String &s, const String &suffix);
-IDEF bool string_has_prefix(const String &s, const String &prefix);
-IDEF bool string_has_suffix(const String &s, const String &suffix);
-IDEF isize string_index(const String &s, const String &substr);
-IDEF isize string_index_byte(const String &s, u8 c);
-IDEF isize string_last_index(const String &s, const String &substr);
-IDEF isize string_last_index_byte(const String &s, u8 c);
-IDEF String string_trim(const String &s, const String &cutset);
-IDEF String string_trim_left(const String &s, const String &cutset);
-IDEF String string_trim_right(const String &s, const String &cutset);
-IDEF String string_trim_space(const String &s);
-IDEF String string_trim_prefix(const String &s, const String &prefix);
-IDEF String string_trim_suffix(const String &s, const String &suffix);
+BASE_DEF i32 string_compare(const String &a, const String &b);
+BASE_DEF bool string_contains(const String &s, const String &substr);
+BASE_DEF bool string_contains_byte(const String &s, u8 c);
+BASE_DEF String string_cut_prefix(const String &s, const String &prefix);
+BASE_DEF String string_cut_suffix(const String &s, const String &suffix);
+BASE_DEF bool string_has_prefix(const String &s, const String &prefix);
+BASE_DEF bool string_has_suffix(const String &s, const String &suffix);
+BASE_DEF isize string_index(const String &s, const String &substr);
+BASE_DEF isize string_index_byte(const String &s, u8 c);
+BASE_DEF isize string_last_index(const String &s, const String &substr);
+BASE_DEF isize string_last_index_byte(const String &s, u8 c);
+BASE_DEF String string_trim(const String &s, const String &cutset);
+BASE_DEF String string_trim_left(const String &s, const String &cutset);
+BASE_DEF String string_trim_right(const String &s, const String &cutset);
+BASE_DEF String string_trim_space(const String &s);
+BASE_DEF String string_trim_prefix(const String &s, const String &prefix);
+BASE_DEF String string_trim_suffix(const String &s, const String &suffix);
 
 // Allocation-based
-IDEF String string_to_lower(Arena *arena, const String &s);
-IDEF String string_to_upper(Arena *arena, const String &s);
-IDEF String string_clone(Arena *arena, const String &s);
-IDEF String string_concat(Arena *arena, const String &a, const String &b);
-IDEF String string_join(Arena *arena, const Array<String> &elems, const String &sep);
-IDEF Array<String> string_split(Arena *arena, const String &s, const String &sep);
-IDEF String string_replace(Arena *arena, const String &s, const String &oldstr, const String &newstr);
+BASE_DEF String string_to_lower(Arena *arena, const String &s);
+BASE_DEF String string_to_upper(Arena *arena, const String &s);
+BASE_DEF String string_clone(Arena *arena, const String &s);
+BASE_DEF String string_concat(Arena *arena, const String &a, const String &b);
+BASE_DEF String string_join(Arena *arena, const Array<String> &elems, const String &sep);
+BASE_DEF Array<String> string_split(Arena *arena, const String &s, const String &sep);
+BASE_DEF String string_replace(Arena *arena, const String &s, const String &oldstr, const String &newstr);
 
 // Hash tables
 
@@ -664,7 +652,7 @@ inline i32 mem_compare(const void *a, const void *b, isize n) {
 
 #if OS_WINDOWS
 
-IDEF isize mem_page_size() {
+BASE_DEF isize mem_page_size() {
     local_persist isize result = 0;
     if (result == 0) {
         SYSTEM_INFO sysinfo = {};
@@ -674,7 +662,7 @@ IDEF isize mem_page_size() {
     return result;
 }
 
-IDEF isize mem_granularity() {
+BASE_DEF isize mem_granularity() {
     local_persist isize result = 0;
     if (result == 0) {
         SYSTEM_INFO sysinfo = {};
@@ -684,12 +672,12 @@ IDEF isize mem_granularity() {
     return result;
 }
 
-IDEF void *mem_reserve(isize size) {
+BASE_DEF void *mem_reserve(isize size) {
     size = ALIGN_UP(size, mem_page_size());
     return VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
 }
 
-IDEF bool mem_commit(void *ptr, isize size) {
+BASE_DEF bool mem_commit(void *ptr, isize size) {
     ASSERT(ptr);
     size = ALIGN_UP(size, mem_page_size());
     void *ret = VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE);
@@ -697,13 +685,13 @@ IDEF bool mem_commit(void *ptr, isize size) {
     return ret != NULL;
 }
 
-IDEF bool mem_decommit(void *ptr, isize size) {
+BASE_DEF bool mem_decommit(void *ptr, isize size) {
     ASSERT(ptr);
     size = ALIGN_UP(size, mem_page_size());
     return VirtualFree(ptr, size, MEM_DECOMMIT) != 0;
 }
 
-IDEF bool mem_release(void *ptr) {
+BASE_DEF bool mem_release(void *ptr) {
     ASSERT(ptr);
     return VirtualFree(ptr, 0, MEM_RELEASE) != 0;
 }
@@ -716,7 +704,7 @@ IDEF bool mem_release(void *ptr) {
 
 #ifdef BASE_IMPLEMENTATION
 
-IDEF Arena *arena_create(isize reserve_size, isize commit_size) {
+BASE_DEF Arena *arena_create(isize reserve_size, isize commit_size) {
     isize page_size = mem_page_size();
     isize gran = mem_granularity();
     reserve_size = ALIGN_UP(reserve_size, gran);
@@ -732,11 +720,11 @@ IDEF Arena *arena_create(isize reserve_size, isize commit_size) {
     return a;
 }
 
-IDEF void arena_destroy(Arena *a) {
+BASE_DEF void arena_destroy(Arena *a) {
     mem_release(a);
 }
 
-IDEF void *arena_push(Arena *a, isize size, bool non_zero) {
+BASE_DEF void *arena_push(Arena *a, isize size, bool non_zero) {
     isize pos_aligned = ALIGN_UP(a->pos, ARENA_ALIGN);
     isize new_pos = pos_aligned + size;
 
@@ -762,34 +750,34 @@ IDEF void *arena_push(Arena *a, isize size, bool non_zero) {
     return out;
 }
 
-IDEF void arena_pop(Arena *a, isize size) {
+BASE_DEF void arena_pop(Arena *a, isize size) {
     size = MIN(size, a->pos - ARENA_BASE_POS);
     a->pos -= size;
 }
 
-IDEF void arena_pop_to(Arena *a, isize pos) {
+BASE_DEF void arena_pop_to(Arena *a, isize pos) {
     isize size = pos < a->pos ? a->pos - pos : 0;
     arena_pop(a, size);
 }
 
-IDEF void arena_clear(Arena *a) {
+BASE_DEF void arena_clear(Arena *a) {
     arena_pop_to(a, ARENA_BASE_POS);
 }
 
-IDEF Temp_Arena begin_temp_arena(Arena *a) {
+BASE_DEF Temp_Arena begin_temp_arena(Arena *a) {
     Temp_Arena temp = {};
     temp.arena = a;
     temp.start_pos = a->pos;
     return temp;
 }
 
-IDEF void end_temp_arena(Temp_Arena temp) {
+BASE_DEF void end_temp_arena(Temp_Arena temp) {
     arena_pop_to(temp.arena, temp.start_pos);
 }
 
 THREAD_LOCAL Arena *scratch_pool[SCRATCH_POOL] = { NULL, NULL };
 
-IDEF Temp_Arena acquire_scratch_arena(Arena **conflicts, i32 num_conflicts) {
+BASE_DEF Temp_Arena acquire_scratch_arena(Arena **conflicts, i32 num_conflicts) {
     isize scratch_index = -1;
 
     for (isize i = 0; i < SCRATCH_POOL; i++) {
@@ -822,7 +810,7 @@ IDEF Temp_Arena acquire_scratch_arena(Arena **conflicts, i32 num_conflicts) {
     return begin_temp_arena(*selected);
 }
 
-IDEF void release_scratch_arena(Temp_Arena scratch) {
+BASE_DEF void release_scratch_arena(Temp_Arena scratch) {
     end_temp_arena(scratch);
 }
 
@@ -1059,7 +1047,7 @@ inline u8 byte_to_upper(u8 c) {
 
 #ifdef BASE_IMPLEMENTATION
 
-IDEF i32 string_compare(const String &a, const String &b) {
+BASE_DEF i32 string_compare(const String &a, const String &b) {
     isize n = MIN(a.len, b.len);
 
     i32 cmp = mem_compare(a.data, b.data, n);
@@ -1070,39 +1058,39 @@ IDEF i32 string_compare(const String &a, const String &b) {
     return 0;
 }
 
-IDEF bool string_contains(const String &s, const String &sub) {
+BASE_DEF bool string_contains(const String &s, const String &sub) {
     return string_index(s, sub) >= 0;
 }
 
-IDEF bool string_contains_byte(const String &s, u8 c) {
+BASE_DEF bool string_contains_byte(const String &s, u8 c) {
     return string_index_byte(s, c) >= 0;
 }
 
-IDEF String string_cut_prefix(const String &s, const String &prefix) {
+BASE_DEF String string_cut_prefix(const String &s, const String &prefix) {
     if (string_has_prefix(s, prefix)) {
         return string_make(s.data + prefix.len, s.len - prefix.len);
     }
     return s;
 }
 
-IDEF String string_cut_suffix(const String &s, const String &suffix) {
+BASE_DEF String string_cut_suffix(const String &s, const String &suffix) {
     if (string_has_suffix(s, suffix)) {
         return string_make(s.data, s.len - suffix.len);
     }
     return s;
 }
 
-IDEF bool string_has_prefix(const String &s, const String &prefix) {
+BASE_DEF bool string_has_prefix(const String &s, const String &prefix) {
     if (prefix.len > s.len) return false;
     return mem_compare(s.data, prefix.data, prefix.len) == 0;
 }
 
-IDEF bool string_has_suffix(const String &s, const String &suffix) {
+BASE_DEF bool string_has_suffix(const String &s, const String &suffix) {
     if (suffix.len > s.len) return false;
     return mem_compare(s.data + (s.len - suffix.len), suffix.data, suffix.len) == 0;
 }
 
-IDEF isize string_index(const String &s, const String &sub) {
+BASE_DEF isize string_index(const String &s, const String &sub) {
     if (sub.len == 0) return 0;
     if (sub.len > s.len) return -1;
 
@@ -1114,14 +1102,14 @@ IDEF isize string_index(const String &s, const String &sub) {
     return -1;
 }
 
-IDEF isize string_index_byte(const String &s, u8 c) {
+BASE_DEF isize string_index_byte(const String &s, u8 c) {
     for (isize i = 0; i < s.len; i++) {
         if (s.data[i] == c) return i;
     }
     return -1;
 }
 
-IDEF isize string_last_index(const String &s, const String &sub) {
+BASE_DEF isize string_last_index(const String &s, const String &sub) {
     if (sub.len == 0) return s.len;
     if (sub.len > s.len) return -1;
 
@@ -1133,26 +1121,26 @@ IDEF isize string_last_index(const String &s, const String &sub) {
     return -1;
 }
 
-IDEF isize string_last_index_byte(const String &s, u8 c) {
+BASE_DEF isize string_last_index_byte(const String &s, u8 c) {
     for (isize i = s.len - 1; i >= 0; i--) {
         if (s.data[i] == c) return i;
     }
     return -1;
 }
 
-IDEF String string_trim_left(const String &s, const String &cutset) {
+BASE_DEF String string_trim_left(const String &s, const String &cutset) {
     isize i = 0;
     while (i < s.len && byte_in_set(s.data[i], cutset)) i++;
     return string_make(s.data + i, s.len - i);
 }
 
-IDEF String string_trim_right(const String &s, const String &cutset) {
+BASE_DEF String string_trim_right(const String &s, const String &cutset) {
     isize end = s.len;
     while (end > 0 && byte_in_set(s.data[end - 1], cutset)) end--;
     return string_make(s.data, end);
 }
 
-IDEF String string_trim_space(const String &s) {
+BASE_DEF String string_trim_space(const String &s) {
     isize start = 0;
     while (start < s.len && byte_is_space(s.data[start])) start++;
 
@@ -1162,43 +1150,43 @@ IDEF String string_trim_space(const String &s) {
     return string_make(s.data + start, end - start);
 }
 
-IDEF String string_trim(const String &s, const String &cutset) {
+BASE_DEF String string_trim(const String &s, const String &cutset) {
     return string_trim_right(string_trim_left(s, cutset), cutset);
 }
 
-IDEF String string_trim_prefix(const String &s, const String &prefix) {
+BASE_DEF String string_trim_prefix(const String &s, const String &prefix) {
     if (string_has_prefix(s, prefix)) {
         return string_make(s.data + prefix.len, s.len - prefix.len);
     }
     return s;
 }
 
-IDEF String string_trim_suffix(const String &s, const String &suffix) {
+BASE_DEF String string_trim_suffix(const String &s, const String &suffix) {
     if (string_has_suffix(s, suffix)) {
         return string_make(s.data, s.len - suffix.len);
     }
     return s;
 }
 
-IDEF String string_to_lower(Arena *arena, const String &s) {
+BASE_DEF String string_to_lower(Arena *arena, const String &s) {
     u8 *data = PUSH_MANY(arena, u8, s.len);
     for (isize i = 0; i < s.len; i++) data[i] = byte_to_lower(s.data[i]);
     return string_make(data, s.len);
 }
 
-IDEF String string_to_upper(Arena *arena, const String &s) {
+BASE_DEF String string_to_upper(Arena *arena, const String &s) {
     u8 *data = PUSH_MANY(arena, u8, s.len);
     for (isize i = 0; i < s.len; i++) data[i] = byte_to_upper(s.data[i]);
     return string_make(data, s.len);
 }
 
-IDEF String string_clone(Arena *arena, const String &s) {
+BASE_DEF String string_clone(Arena *arena, const String &s) {
     u8 *data = PUSH_MANY(arena, u8, s.len);
     mem_copy(data, s.data, s.len);
     return string_make(data, s.len);
 }
 
-IDEF String string_concat(Arena *arena, const String &a, const String &b) {
+BASE_DEF String string_concat(Arena *arena, const String &a, const String &b) {
     isize len = a.len + b.len;
     u8 *data = PUSH_MANY(arena, u8, len);
 
@@ -1208,7 +1196,7 @@ IDEF String string_concat(Arena *arena, const String &a, const String &b) {
     return string_make(data, len);
 }
 
-IDEF String string_join(Arena *arena, const Array<String> &elems, const String &sep) {
+BASE_DEF String string_join(Arena *arena, const Array<String> &elems, const String &sep) {
     if (elems.len == 0) return string_empty();
 
     // compute total length
@@ -1237,7 +1225,7 @@ IDEF String string_join(Arena *arena, const Array<String> &elems, const String &
     return string_make(data, total);
 }
 
-IDEF Array<String> string_split(Arena *arena, const String &s, const String &sep) {
+BASE_DEF Array<String> string_split(Arena *arena, const String &s, const String &sep) {
     Array<String> result;
     array_init(&result, arena);
 
@@ -1274,7 +1262,7 @@ IDEF Array<String> string_split(Arena *arena, const String &s, const String &sep
     return result;
 }
 
-IDEF String string_replace(Arena *arena,
+BASE_DEF String string_replace(Arena *arena,
                            const String &s,
                            const String &oldstr,
                            const String &newstr) {

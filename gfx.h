@@ -1,6 +1,10 @@
 #ifndef GFX_H
 #define GFX_H
 
+//
+// DECLARATION
+//
+
 #include "base.h"
 
 #pragma push_macro("internal")
@@ -8,9 +12,11 @@
 #include <SDL3/SDL.h>
 #pragma pop_macro("internal")
 
-//
-// DECLARATION
-//
+#ifdef GFX_IMPLEMENTATION
+    #define GFX_DEF
+#else
+    #define GFX_DEF extern
+#endif
 
 extern bool gfx_initted;
 extern SDL_Window *gfx_window;
@@ -19,11 +25,11 @@ extern SDL_GPUGraphicsPipeline *gfx_pipeline;
 
 #define GFX_SHADER_FORMAT (SDL_GPU_SHADERFORMAT_SPIRV)
 
-IDEF SDL_GPUShader *gfx_load_shader(const String &file);
+GFX_DEF SDL_GPUShader *gfx_load_shader(const String &file);
 
-IDEF bool gfx_init(SDL_Window *window);
-IDEF void gfx_quit();
-IDEF void gfx_draw();
+GFX_DEF bool gfx_init(SDL_Window *window);
+GFX_DEF void gfx_quit();
+GFX_DEF void gfx_draw();
 
 //
 // IMPLEMENTATION
@@ -53,7 +59,7 @@ SDL_GPUGraphicsPipeline *gfx_pipeline = NULL;
 //     - Storage buffers, e.g. "0b"
 //     - Uniform buffers, e.g. "1u"
 //
-IDEF SDL_GPUShader *gfx_load_shader(const String &file) {
+GFX_DEF SDL_GPUShader *gfx_load_shader(const String &file) {
     auto s = acquire_scratch_arena();
     defer(release_scratch_arena(s));
 
@@ -126,7 +132,7 @@ IDEF SDL_GPUShader *gfx_load_shader(const String &file) {
     return SDL_CreateGPUShader(gfx_device, &info);
 }
 
-IDEF bool gfx_init(SDL_Window *window) {
+GFX_DEF bool gfx_init(SDL_Window *window) {
     gfx_window = window;
     gfx_device = SDL_CreateGPUDevice(GFX_SHADER_FORMAT, true, NULL);
 
@@ -166,7 +172,7 @@ IDEF bool gfx_init(SDL_Window *window) {
     return gfx_initted;
 }
 
-IDEF void gfx_quit() {
+GFX_DEF void gfx_quit() {
     if (gfx_initted) {
         SDL_ReleaseGPUGraphicsPipeline(gfx_device, gfx_pipeline);
         SDL_ReleaseWindowFromGPUDevice(gfx_device, gfx_window);
@@ -175,7 +181,7 @@ IDEF void gfx_quit() {
     gfx_initted = false;
 }
 
-IDEF void gfx_draw() {
+GFX_DEF void gfx_draw() {
     auto command_buf = SDL_AcquireGPUCommandBuffer(gfx_device);
     SDL_GPUTexture *swapchain_tex;
     ASSERT(SDL_WaitAndAcquireGPUSwapchainTexture(command_buf, gfx_window, &swapchain_tex, NULL, NULL));
