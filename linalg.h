@@ -11,12 +11,11 @@
     #define LINALG_DEF extern
 #endif
 
-typedef struct { float x, y; }       Vec2;
-typedef struct { float x, y, z; }    Vec3;
+typedef struct { float x, y;       } Vec2;
+typedef struct { float x, y, z;    } Vec3;
 typedef struct { float x, y, z, w; } Vec4;
-typedef struct { float m[16]; }      Mat4;
+typedef struct { float m[16];      } Mat4;
 typedef struct { float x, y, z, w; } Quat;
-
 typedef struct {
     Vec3 position;
     Quat rotation;
@@ -34,12 +33,6 @@ LINALG_DEF float vec2_length(Vec2 v);
 LINALG_DEF float vec2_length_sq(Vec2 v);
 LINALG_DEF Vec2 vec2_norm(Vec2 v);
 
-LINALG_DEF Vec2 operator + (Vec2 a, Vec2 b);
-LINALG_DEF Vec2 operator - (Vec2 a, Vec2 b);
-LINALG_DEF Vec2 operator * (Vec2 a, Vec2 b);
-LINALG_DEF Vec2 operator / (Vec2 a, Vec2 b);
-LINALG_DEF Vec2 operator * (Vec2 v, float s);
-
 LINALG_DEF Vec3 vec3_make(float x, float y, float z);
 LINALG_DEF Vec3 vec3_add(Vec3 a, Vec3 b);
 LINALG_DEF Vec3 vec3_sub(Vec3 a, Vec3 b);
@@ -53,12 +46,6 @@ LINALG_DEF float vec3_length_sq(Vec3 v);
 LINALG_DEF Vec3 vec3_norm(Vec3 v);
 LINALG_DEF Vec3 vec3_rotate_quat(Vec3 v, Quat q);
 
-LINALG_DEF Vec3 operator + (Vec3 a, Vec3 b);
-LINALG_DEF Vec3 operator - (Vec3 a, Vec3 b);
-LINALG_DEF Vec3 operator * (Vec3 a, Vec3 b);
-LINALG_DEF Vec3 operator / (Vec3 a, Vec3 b);
-LINALG_DEF Vec3 operator * (Vec3 v, float s);
-
 LINALG_DEF Vec4 vec4_make(float x, float y, float z, float w);
 LINALG_DEF Vec4 vec4_add(Vec4 a, Vec4 b);
 LINALG_DEF Vec4 vec4_sub(Vec4 a, Vec4 b);
@@ -69,12 +56,6 @@ LINALG_DEF float vec4_dot(Vec4 a, Vec4 b);
 LINALG_DEF float vec4_length(Vec4 v);
 LINALG_DEF float vec4_length_sq(Vec4 v);
 LINALG_DEF Vec4 vec4_norm(Vec4 v);
-
-LINALG_DEF Vec4 operator + (Vec4 a, Vec4 b);
-LINALG_DEF Vec4 operator - (Vec4 a, Vec4 b);
-LINALG_DEF Vec4 operator * (Vec4 a, Vec4 b);
-LINALG_DEF Vec4 operator / (Vec4 a, Vec4 b);
-LINALG_DEF Vec4 operator * (Vec4 v, float s);
 
 // These are column-major, right-handed, column vectors,
 // i.e. result = M * v, and transforms compose as M = T * R * S
@@ -92,8 +73,6 @@ LINALG_DEF Mat4 mat4_ortho(float left, float right, float bottom, float top, flo
 LINALG_DEF Mat4 mat4_transpose(Mat4 m);
 LINALG_DEF Mat4 mat4_inverse_affine(Mat4 m);
 
-LINALG_DEF Mat4 operator * (Mat4 a, Mat4 b);
-
 // Quaternion multiplication order matters. This implementation uses Hamilton product,
 // where quat_mul(a, b) means apply b then a (same convention as mat4_mul).
 LINALG_DEF Quat quat_make(float x, float y, float z, float w);
@@ -109,6 +88,66 @@ LINALG_DEF Quat quat_slerp(Quat a, Quat b, float t);
 LINALG_DEF Transform transform_make(Vec3 pos, Quat rot, Vec3 scale);
 LINALG_DEF Mat4 transform_to_mat4(Transform t);
 LINALG_DEF Transform transform_mul(Transform a, Transform b);
+
+#ifdef __cplusplus
+
+// Basic operations
+LINALG_DEF Vec2 operator + (Vec2 a, Vec2 b);
+LINALG_DEF Vec2 operator - (Vec2 a, Vec2 b);
+LINALG_DEF Vec2 operator - (Vec2 v); // negation 
+LINALG_DEF Vec2 operator * (Vec2 a, Vec2 b); // component-wise
+LINALG_DEF Vec2 operator / (Vec2 a, Vec2 b); // component-wise
+// Scalar operations
+LINALG_DEF Vec2 operator * (Vec2 v, float s);
+LINALG_DEF Vec2 operator * (float s, Vec2 v);
+LINALG_DEF Vec2 operator / (Vec2 v, float s);
+// Compound assignment
+LINALG_DEF Vec2 &operator += (Vec2 &lhs, Vec2 rhs);
+LINALG_DEF Vec2 &operator -= (Vec2 &lhs, Vec2 rhs);
+LINALG_DEF Vec2 &operator *= (Vec2 &lhs, Vec2 rhs);
+LINALG_DEF Vec2 &operator *= (Vec2 &lhs, float rhs);
+LINALG_DEF Vec2 &operator /= (Vec2 &lhs, Vec2 rhs);
+LINALG_DEF Vec2 &operator /= (Vec2 &lhs, float rhs);
+
+// Basic operations
+LINALG_DEF Vec3 operator + (Vec3 a, Vec3 b);
+LINALG_DEF Vec3 operator - (Vec3 a, Vec3 b);
+LINALG_DEF Vec3 operator - (Vec3 v); // negation
+LINALG_DEF Vec3 operator * (Vec3 a, Vec3 b); // component-wise
+LINALG_DEF Vec3 operator / (Vec3 a, Vec3 b); // component-wise
+// Scalar operations
+LINALG_DEF Vec3 operator * (Vec3 v, float s);
+LINALG_DEF Vec3 operator * (float s, Vec3 v);
+LINALG_DEF Vec3 operator / (Vec3 v, float s);
+// Compound assignment
+LINALG_DEF Vec3 &operator += (Vec3 &lhs, Vec3 rhs);
+LINALG_DEF Vec3 &operator -= (Vec3 &lhs, Vec3 rhs);
+LINALG_DEF Vec3 &operator *= (Vec3 &lhs, Vec3 rhs);
+LINALG_DEF Vec3 &operator *= (Vec3 &lhs, float rhs);
+LINALG_DEF Vec3 &operator /= (Vec3 &lhs, Vec3 rhs);
+LINALG_DEF Vec3 &operator /= (Vec3 &lhs, float rhs);
+
+// Basic operations
+LINALG_DEF Vec4 operator + (Vec4 a, Vec4 b);
+LINALG_DEF Vec4 operator - (Vec4 a, Vec4 b);
+LINALG_DEF Vec4 operator - (Vec4 v); // negation
+LINALG_DEF Vec4 operator * (Vec4 a, Vec4 b); // component-wise
+LINALG_DEF Vec4 operator / (Vec4 a, Vec4 b); // component-wise
+// Scalar operations
+LINALG_DEF Vec4 operator * (Vec4 v, float s);
+LINALG_DEF Vec4 operator * (float s, Vec4 v);
+LINALG_DEF Vec4 operator / (Vec4 v, float s);
+// Compound assignment
+LINALG_DEF Vec4 &operator += (Vec4 &lhs, Vec4 rhs);
+LINALG_DEF Vec4 &operator -= (Vec4 &lhs, Vec4 rhs);
+LINALG_DEF Vec4 &operator *= (Vec4 &lhs, Vec4 rhs);
+LINALG_DEF Vec4 &operator *= (Vec4 &lhs, float rhs);
+LINALG_DEF Vec4 &operator /= (Vec4 &lhs, Vec4 rhs);
+LINALG_DEF Vec4 &operator /= (Vec4 &lhs, float rhs);
+
+// TODO: mat4 and quat
+
+#endif // __cplusplus
 
 //
 // IMPLEMENTATION
@@ -161,26 +200,6 @@ LINALG_DEF Vec2 vec2_norm(Vec2 v) {
     float len = vec2_length(v);
     if (len == 0.0f) return vec2_make(0.0f, 0.0f);
     return vec2_scale(v, 1.0f / len);
-}
-
-LINALG_DEF Vec2 operator + (Vec2 a, Vec2 b) {
-    return vec2_add(a, b);
-}
-
-LINALG_DEF Vec2 operator - (Vec2 a, Vec2 b) {
-    return vec2_sub(a, b);
-}
-
-LINALG_DEF Vec2 operator * (Vec2 a, Vec2 b) {
-    return vec2_mul(a, b);
-}
-
-LINALG_DEF Vec2 operator / (Vec2 a, Vec2 b) {
-    return vec2_div(a, b);
-}
-
-LINALG_DEF Vec2 operator * (Vec2 v, float s) {
-    return vec2_scale(v, s);
 }
 
 LINALG_DEF Vec3 vec3_make(float x, float y, float z) {
@@ -244,26 +263,6 @@ LINALG_DEF Vec3 vec3_rotate_quat(Vec3 v, Quat q) {
     return vec3_make(rq.x, rq.y, rq.z);
 }
 
-LINALG_DEF Vec3 operator + (Vec3 a, Vec3 b) {
-    return vec3_add(a, b);
-}
-
-LINALG_DEF Vec3 operator - (Vec3 a, Vec3 b) {
-    return vec3_sub(a, b);
-}
-
-LINALG_DEF Vec3 operator * (Vec3 a, Vec3 b) {
-    return vec3_mul(a, b);
-}
-
-LINALG_DEF Vec3 operator / (Vec3 a, Vec3 b) {
-    return vec3_div(a, b);
-}
-
-LINALG_DEF Vec3 operator * (Vec3 v, float s) {
-    return vec3_scale(v, s);
-}
-
 LINALG_DEF Vec4 vec4_make(float x, float y, float z, float w) {
     Vec4 v;
     v.x = x;
@@ -309,26 +308,6 @@ LINALG_DEF Vec4 vec4_norm(Vec4 v) {
     float len = vec4_length(v);
     if (len == 0.0f) return vec4_make(0.0f, 0.0f, 0.0f, 0.0f);
     return vec4_scale(v, 1.0f / len);
-}
-
-LINALG_DEF Vec4 operator + (Vec4 a, Vec4 b) {
-    return vec4_add(a, b);
-}
-
-LINALG_DEF Vec4 operator - (Vec4 a, Vec4 b) {
-    return vec4_sub(a, b);
-}
-
-LINALG_DEF Vec4 operator * (Vec4 a, Vec4 b) {
-    return vec4_mul(a, b);
-}
-
-LINALG_DEF Vec4 operator / (Vec4 a, Vec4 b) {
-    return vec4_div(a, b);
-}
-
-LINALG_DEF Vec4 operator * (Vec4 v, float s) {
-    return vec4_scale(v, s);
 }
 
 LINALG_DEF Mat4 mat4_identity(void) {
@@ -714,6 +693,196 @@ LINALG_DEF Transform transform_mul(Transform a, Transform b) {
 
     return r;
 }
+
+#ifdef __cplusplus
+
+LINALG_DEF Vec2 operator + (Vec2 a, Vec2 b) {
+    return vec2_add(a, b);
+}
+
+LINALG_DEF Vec2 operator - (Vec2 a, Vec2 b) {
+    return vec2_sub(a, b);
+}
+
+LINALG_DEF Vec2 operator - (Vec2 v) {
+    return vec2_make(-v.x, -v.y);
+}
+
+LINALG_DEF Vec2 operator * (Vec2 a, Vec2 b) {
+    return vec2_mul(a, b);
+}
+
+LINALG_DEF Vec2 operator / (Vec2 a, Vec2 b) {
+    return vec2_div(a, b);
+}
+
+LINALG_DEF Vec2 operator * (Vec2 v, float s) {
+    return vec2_scale(v, s);
+}
+
+LINALG_DEF Vec2 operator * (float s, Vec2 v) {
+    return vec2_scale(v, s);
+}
+
+LINALG_DEF Vec2 operator / (Vec2 v, float s) {
+    return vec2_scale(v, 1.0f/s);
+}
+
+LINALG_DEF Vec2 &operator += (Vec2 &lhs, Vec2 rhs) {
+    lhs = vec2_add(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec2 &operator -= (Vec2 &lhs, Vec2 rhs) {
+    lhs = vec2_sub(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec2 &operator *= (Vec2 &lhs, Vec2 rhs) {
+    lhs = vec2_mul(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec2 &operator *= (Vec2 &lhs, float rhs) {
+    lhs = vec2_scale(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec2 &operator /= (Vec2 &lhs, Vec2 rhs) {
+    lhs = vec2_div(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec2 &operator /= (Vec2 &lhs, float rhs) {
+    lhs = vec2_scale(lhs, 1.0f/rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec3 operator + (Vec3 a, Vec3 b) {
+    return vec3_add(a, b);
+}
+
+LINALG_DEF Vec3 operator - (Vec3 a, Vec3 b) {
+    return vec3_sub(a, b);
+}
+
+LINALG_DEF Vec3 operator - (Vec3 v) {
+    return vec3_make(-v.x, -v.y, -v.z);
+}
+
+LINALG_DEF Vec3 operator * (Vec3 a, Vec3 b) {
+    return vec3_mul(a, b);
+}
+
+LINALG_DEF Vec3 operator / (Vec3 a, Vec3 b) {
+    return vec3_div(a, b);
+}
+
+LINALG_DEF Vec3 operator * (Vec3 v, float s) {
+    return vec3_scale(v, s);
+}
+
+LINALG_DEF Vec3 operator * (float s, Vec3 v) {
+    return vec3_scale(v, s);
+}
+
+LINALG_DEF Vec3 operator / (Vec3 v, float s) {
+    return vec3_scale(v, 1.0f/s);
+}
+
+LINALG_DEF Vec3 &operator += (Vec3 &lhs, Vec3 rhs) {
+    lhs = vec3_add(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec3 &operator -= (Vec3 &lhs, Vec3 rhs) {
+    lhs = vec3_sub(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec3 &operator *= (Vec3 &lhs, Vec3 rhs) {
+    lhs = vec3_mul(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec3 &operator *= (Vec3 &lhs, float rhs) {
+    lhs = vec3_scale(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec3 &operator /= (Vec3 &lhs, Vec3 rhs) {
+    lhs = vec3_div(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec3 &operator /= (Vec3 &lhs, float rhs) {
+    lhs = vec3_scale(lhs, 1.0f/rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec4 operator + (Vec4 a, Vec4 b) {
+    return vec4_add(a, b);
+}
+
+LINALG_DEF Vec4 operator - (Vec4 a, Vec4 b) {
+    return vec4_sub(a, b);
+}
+
+LINALG_DEF Vec4 operator - (Vec4 v) {
+    return vec4_make(-v.x, -v.y, -v.z, -v.w);
+}
+
+LINALG_DEF Vec4 operator * (Vec4 a, Vec4 b) {
+    return vec4_mul(a, b);
+}
+
+LINALG_DEF Vec4 operator / (Vec4 a, Vec4 b) {
+    return vec4_div(a, b);
+}
+
+LINALG_DEF Vec4 operator * (Vec4 v, float s) {
+    return vec4_scale(v, s);
+}
+
+LINALG_DEF Vec4 operator * (float s, Vec4 v) {
+    return vec4_scale(v, s);
+}
+
+LINALG_DEF Vec4 operator / (Vec4 v, float s) {
+    return vec4_scale(v, 1.0f/s);
+}
+
+LINALG_DEF Vec4 &operator += (Vec4 &lhs, Vec4 rhs) {
+    lhs = vec4_add(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec4 &operator -= (Vec4 &lhs, Vec4 rhs) {
+    lhs = vec4_sub(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec4 &operator *= (Vec4 &lhs, Vec4 rhs) {
+    lhs = vec4_mul(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec4 &operator *= (Vec4 &lhs, float rhs) {
+    lhs = vec4_scale(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec4 &operator /= (Vec4 &lhs, Vec4 rhs) {
+    lhs = vec4_div(lhs, rhs);
+    return lhs;
+}
+
+LINALG_DEF Vec4 &operator /= (Vec4 &lhs, float rhs) {
+    lhs = vec4_scale(lhs, 1.0f/rhs);
+    return lhs;
+}
+
+#endif // __cplusplus
 
 #endif // LINALG_IMPLEMENTATION
 

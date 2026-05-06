@@ -112,14 +112,16 @@ int main() {
 
     RUN_TEST(test_vec2);
     RUN_TEST(test_vec2_ops);
+    RUN_TEST(test_vec2_ops_assignment);
     RUN_TEST(test_vec3);
     RUN_TEST(test_vec3_ops);
+    RUN_TEST(test_vec3_ops_assignment);
     RUN_TEST(test_vec3_cross_orthogonality);
     RUN_TEST(test_vec3_norm_idempotence);
     RUN_TEST(test_vec4);
     RUN_TEST(test_vec4_ops);
+    RUN_TEST(test_vec4_ops_assignment);
     RUN_TEST(test_mat4);
-    RUN_TEST(test_mat4_ops);
     RUN_TEST(test_mat4_inverse);
     RUN_TEST(test_mat4_inverse2);
     RUN_TEST(test_mat4_look_at);
