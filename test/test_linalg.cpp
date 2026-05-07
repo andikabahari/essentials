@@ -238,7 +238,7 @@ TEST(test_mat4) {
     Mat4 R = mat4_mul(I, T);
     ASSERT(mat4_eq(R, T));
 
-    Mat4 S = mat4_scale(vec3_make(2,2,2));
+    Mat4 S = mat4_scaling(vec3_make(2,2,2));
     Mat4 M = mat4_mul(T, S);
 
     // spot check scale on diagonal
@@ -248,8 +248,8 @@ TEST(test_mat4) {
 }
 
 TEST(test_mat4_inverse) {
-    Mat4 m = mat4_rotate_x(1.0f);
-    Mat4 inv = mat4_inverse_affine(m);
+    Mat4 m = mat4_rotate(1.0f, vec3_make(1,0,0));
+    Mat4 inv = mat4_inverse(m);
     Mat4 identity = mat4_mul(m, inv);
     
     for(int i = 0; i < 16; i++) {
@@ -259,11 +259,11 @@ TEST(test_mat4_inverse) {
 
 TEST(test_mat4_inverse2) {
     Mat4 T = mat4_translate(vec3_make(3, -2, 5));
-    Mat4 R = mat4_rotate_y(1.2f);
-    Mat4 S = mat4_scale(vec3_make(2, 3, 4));
+    Mat4 R = mat4_rotate(1.2f, vec3_make(0,1,0));
+    Mat4 S = mat4_scaling(vec3_make(2, 3, 4));
 
     Mat4 M = mat4_mul(T, mat4_mul(R, S));
-    Mat4 inv = mat4_inverse_affine(M);
+    Mat4 inv = mat4_inverse(M);
 
     Mat4 should_be_I = mat4_mul(M, inv);
     ASSERT(mat4_is_identity(should_be_I));

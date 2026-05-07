@@ -22,6 +22,14 @@ typedef struct {
     Vec3 scale;
 } Transform;
 
+// Column-major memory layout
+enum {
+    MAT4_00, MAT4_10, MAT4_20, MAT4_30,
+    MAT4_01, MAT4_11, MAT4_21, MAT4_31,
+    MAT4_02, MAT4_12, MAT4_22, MAT4_32,
+    MAT4_03, MAT4_13, MAT4_23, MAT4_33,
+};
+
 LINALG_DEF Vec2 vec2_make(float x, float y);
 LINALG_DEF Vec2 vec2_add(Vec2 a, Vec2 b);
 LINALG_DEF Vec2 vec2_sub(Vec2 a, Vec2 b);
@@ -61,17 +69,16 @@ LINALG_DEF Vec4 vec4_norm(Vec4 v);
 // i.e. result = M * v, and transforms compose as M = T * R * S
 LINALG_DEF Mat4 mat4_identity(void);
 LINALG_DEF Mat4 mat4_mul(Mat4 a, Mat4 b);
+LINALG_DEF Mat4 mat4_scalar_mul(Mat4 m, float s);
 LINALG_DEF Mat4 mat4_translate(Vec3 t);
-LINALG_DEF Mat4 mat4_scale(Vec3 s);
-LINALG_DEF Mat4 mat4_rotate_x(float rads);
-LINALG_DEF Mat4 mat4_rotate_y(float rads);
-LINALG_DEF Mat4 mat4_rotate_z(float rads);
+LINALG_DEF Mat4 mat4_scaling(Vec3 s);
+LINALG_DEF Mat4 mat4_rotate(float rads, Vec3 v);
 LINALG_DEF Mat4 mat4_from_quat(Quat q);
 LINALG_DEF Mat4 mat4_look_at(Vec3 eye, Vec3 center, Vec3 up);
 LINALG_DEF Mat4 mat4_perspective(float fov_rads, float aspect, float near, float far);
 LINALG_DEF Mat4 mat4_ortho(float left, float right, float bottom, float top, float near, float far);
 LINALG_DEF Mat4 mat4_transpose(Mat4 m);
-LINALG_DEF Mat4 mat4_inverse_affine(Mat4 m);
+LINALG_DEF Mat4 mat4_inverse(Mat4 m);
 
 // Quaternion multiplication order matters. This implementation uses Hamilton product,
 // where quat_mul(a, b) means apply b then a (same convention as mat4_mul).
@@ -333,6 +340,14 @@ LINALG_DEF Mat4 mat4_mul(Mat4 a, Mat4 b) {
     return r;
 }
 
+LINALG_DEF Mat4 mat4_scalar_mul(Mat4 m, float s) {
+    Mat4 r;
+    for (int i = 0; i < 16; i++) {
+        r.m[i] = m.m[i] * s;
+    }
+    return r;
+}
+
 LINALG_DEF Mat4 mat4_translate(Vec3 t) {
     Mat4 m = mat4_identity();
     m.m[12] = t.x;
@@ -341,7 +356,7 @@ LINALG_DEF Mat4 mat4_translate(Vec3 t) {
     return m;
 }
 
-LINALG_DEF Mat4 mat4_scale(Vec3 s) {
+LINALG_DEF Mat4 mat4_scaling(Vec3 s) {
     Mat4 m = {0};
     m.m[0]  = s.x;
     m.m[5]  = s.y;
@@ -350,40 +365,34 @@ LINALG_DEF Mat4 mat4_scale(Vec3 s) {
     return m;
 }
 
-LINALG_DEF Mat4 mat4_rotate_x(float r) {
-    float c = cosf(r);
-    float s = sinf(r);
+LINALG_DEF Mat4 mat4_rotate(float rads, Vec3 axis) {
+    float c = cosf(rads);
+    float s = sinf(rads);
 
-    Mat4 m = mat4_identity();
-    m.m[5]  = c;
-    m.m[6]  = s;
-    m.m[9]  = -s;
-    m.m[10] = c;
-    return m;
-}
+    Vec3 a = vec3_norm(axis);
+    Vec3 t = vec3_scale(a, 1.0f - c);
 
-LINALG_DEF Mat4 mat4_rotate_y(float r) {
-    float c = cosf(r);
-    float s = sinf(r);
+    Mat4 rot = mat4_identity();
 
-    Mat4 m = mat4_identity();
-    m.m[0]  = c;
-    m.m[2]  = -s;
-    m.m[8]  = s;
-    m.m[10] = c;
-    return m;
-}
+    // Column 0
+    rot.m[MAT4_00] = c + t.x * a.x;
+    rot.m[MAT4_10] = t.x * a.y + s * a.z;
+    rot.m[MAT4_20] = t.x * a.z - s * a.y;
+    rot.m[MAT4_30] = 0.0f;
 
-LINALG_DEF Mat4 mat4_rotate_z(float r) {
-    float c = cosf(r);
-    float s = sinf(r);
+    // Column 1
+    rot.m[MAT4_01] = t.y * a.x - s * a.z;
+    rot.m[MAT4_11] = c + t.y * a.y;
+    rot.m[MAT4_21] = t.y * a.z + s * a.x;
+    rot.m[MAT4_31] = 0.0f;
 
-    Mat4 m = mat4_identity();
-    m.m[0] = c;
-    m.m[1] = s;
-    m.m[4] = -s;
-    m.m[5] = c;
-    return m;
+    // Column 2
+    rot.m[MAT4_02] = t.z * a.x + s * a.y;
+    rot.m[MAT4_12] = t.z * a.y - s * a.x;
+    rot.m[MAT4_22] = c + t.z * a.z;
+    rot.m[MAT4_32] = 0.0f;
+
+    return rot;
 }
 
 LINALG_DEF Mat4 mat4_from_quat(Quat q) {
@@ -476,7 +485,7 @@ LINALG_DEF Mat4 mat4_transpose(Mat4 m) {
     return r;
 }
 
-LINALG_DEF Mat4 mat4_inverse_affine(Mat4 m) {
+LINALG_DEF Mat4 mat4_inverse(Mat4 m) {
     Mat4 r;
 
     float a00 = m.m[0],  a01 = m.m[4],  a02 = m.m[8];
@@ -489,7 +498,6 @@ LINALG_DEF Mat4 mat4_inverse_affine(Mat4 m) {
         a02*(a10*a21 - a11*a20);
 
     if (fabsf(det) < 1e-8f) {
-        // non-invertible → return identity as fallback
         return mat4_identity();
     }
 
@@ -674,7 +682,7 @@ LINALG_DEF Transform transform_make(Vec3 pos, Quat rot, Vec3 scale) {
 LINALG_DEF Mat4 transform_to_mat4(Transform t) {
     Mat4 T = mat4_translate(t.position);
     Mat4 R = mat4_from_quat(t.rotation);
-    Mat4 S = mat4_scale(t.scale);
+    Mat4 S = mat4_scaling(t.scale);
 
     // column-major, column vectors: M = T * R * S
     return mat4_mul(T, mat4_mul(R, S));
