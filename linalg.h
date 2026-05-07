@@ -66,7 +66,7 @@ LINALG_DEF Mat4 mat4_scale(Vec3 s);
 LINALG_DEF Mat4 mat4_rotate_x(float rads);
 LINALG_DEF Mat4 mat4_rotate_y(float rads);
 LINALG_DEF Mat4 mat4_rotate_z(float rads);
-LINALG_DEF Mat4 mat4_from_quat_make(Quat q);
+LINALG_DEF Mat4 mat4_from_quat(Quat q);
 LINALG_DEF Mat4 mat4_look_at(Vec3 eye, Vec3 center, Vec3 up);
 LINALG_DEF Mat4 mat4_perspective(float fov_rads, float aspect, float near, float far);
 LINALG_DEF Mat4 mat4_ortho(float left, float right, float bottom, float top, float near, float far);
@@ -386,7 +386,7 @@ LINALG_DEF Mat4 mat4_rotate_z(float r) {
     return m;
 }
 
-LINALG_DEF Mat4 mat4_from_quat_make(Quat q) {
+LINALG_DEF Mat4 mat4_from_quat(Quat q) {
     float x = q.x, y = q.y, z = q.z, w = q.w;
 
     float xx = x * x;
@@ -673,7 +673,7 @@ LINALG_DEF Transform transform_make(Vec3 pos, Quat rot, Vec3 scale) {
 
 LINALG_DEF Mat4 transform_to_mat4(Transform t) {
     Mat4 T = mat4_translate(t.position);
-    Mat4 R = mat4_from_quat_make(t.rotation);
+    Mat4 R = mat4_from_quat(t.rotation);
     Mat4 S = mat4_scale(t.scale);
 
     // column-major, column vectors: M = T * R * S
