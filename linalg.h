@@ -1,3 +1,48 @@
+//
+// linalg.h
+//
+// This is a public domain C/C++ library.
+// No warranty implied, use at your own risk!
+//
+// This library is primarily focused on graphics programming.
+// There are many libraries out there that are more optimized
+// and feature-complete than this one. I made this library mainly
+// for my own personal needs and preferred ergonomics.
+//
+// I believe most, if not all, of the functionality provided here
+// can also be found in other popular math libraries. There is
+// nothing particularly unique about it. The one thing that is
+// probably worth explaining specifically is the operator overloading.
+//
+// I tried to keep the operators relatively close to actual math
+// notation. Because of that, some operations that are allowed in
+// shader languages such as GLSL are intentionally disallowed here.
+//
+// For example, given a vector v, GLSL allows operations like:
+//
+//   v + 1.0
+//   1.0 + v
+//   1.0 - v
+//   1.0 / v
+//
+// These operations are interpreted component-wise in GLSL, but
+// they do not really correspond to standard linear algebra notation.
+//
+// In this library, I intentionally restrict certain operations
+// while still allowing some practical conveniences commonly used
+// in graphics programming.
+//
+// In summary, these are the rules:
+//
+//   v + u    allowed
+//   v + s    forbidden
+//   v * u    component-wise
+//
+//   m1 + m2  allowed
+//   m1 + s   forbidden
+//   m1 * m2  matrix multiplication
+//
+
 #ifndef LINALG_H
 #define LINALG_H
 
@@ -196,9 +241,6 @@ LINALG_DEF Quat &operator -= (Quat &lhs, Quat rhs);
 LINALG_DEF Quat &operator *= (Quat &lhs, Quat rhs);
 LINALG_DEF Quat &operator *= (Quat &lhs, float rhs);
 LINALG_DEF Quat &operator /= (Quat &lhs, float rhs);
-
-
-// TODO: mat4 and quat
 
 #endif // __cplusplus
 
