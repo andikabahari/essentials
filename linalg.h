@@ -319,10 +319,10 @@ LINALG_DEF Vec4 vec4_norm(Vec4 v) {
 
 LINALG_DEF Mat4 mat4_identity(void) {
     Mat4 m = {0};
-    m.m[0]  = 1.0f;
-    m.m[5]  = 1.0f;
-    m.m[10] = 1.0f;
-    m.m[15] = 1.0f;
+    m.m[MAT4_00] = 1.0f;
+    m.m[MAT4_11] = 1.0f;
+    m.m[MAT4_22] = 1.0f;
+    m.m[MAT4_33] = 1.0f;
     return m;
 }
 
@@ -350,18 +350,18 @@ LINALG_DEF Mat4 mat4_scalar_mul(Mat4 m, float s) {
 
 LINALG_DEF Mat4 mat4_translate(Vec3 t) {
     Mat4 m = mat4_identity();
-    m.m[12] = t.x;
-    m.m[13] = t.y;
-    m.m[14] = t.z;
+    m.m[MAT4_03] = t.x;
+    m.m[MAT4_13] = t.y;
+    m.m[MAT4_23] = t.z;
     return m;
 }
 
 LINALG_DEF Mat4 mat4_scaling(Vec3 s) {
     Mat4 m = {0};
-    m.m[0]  = s.x;
-    m.m[5]  = s.y;
-    m.m[10] = s.z;
-    m.m[15] = 1.0f;
+    m.m[MAT4_00] = s.x;
+    m.m[MAT4_11] = s.y;
+    m.m[MAT4_22] = s.z;
+    m.m[MAT4_33] = 1.0f;
     return m;
 }
 
@@ -410,17 +410,17 @@ LINALG_DEF Mat4 mat4_from_quat(Quat q) {
 
     Mat4 m = mat4_identity();
 
-    m.m[0]  = 1.0f - 2.0f * (yy + zz);
-    m.m[1]  = 2.0f * (xy + wz);
-    m.m[2]  = 2.0f * (xz - wy);
+    m.m[MAT4_00] = 1.0f - 2.0f * (yy + zz);
+    m.m[MAT4_10] = 2.0f * (xy + wz);
+    m.m[MAT4_20] = 2.0f * (xz - wy);
 
-    m.m[4]  = 2.0f * (xy - wz);
-    m.m[5]  = 1.0f - 2.0f * (xx + zz);
-    m.m[6]  = 2.0f * (yz + wx);
+    m.m[MAT4_01] = 2.0f * (xy - wz);
+    m.m[MAT4_11] = 1.0f - 2.0f * (xx + zz);
+    m.m[MAT4_21] = 2.0f * (yz + wx);
 
-    m.m[8]  = 2.0f * (xz + wy);
-    m.m[9]  = 2.0f * (yz - wx);
-    m.m[10] = 1.0f - 2.0f * (xx + yy);
+    m.m[MAT4_02] = 2.0f * (xz + wy);
+    m.m[MAT4_12] = 2.0f * (yz - wx);
+    m.m[MAT4_22] = 1.0f - 2.0f * (xx + yy);
 
     return m;
 }
@@ -432,21 +432,21 @@ LINALG_DEF Mat4 mat4_look_at(Vec3 eye, Vec3 center, Vec3 up) {
 
     Mat4 m = mat4_identity();
 
-    m.m[0] = s.x;
-    m.m[1] = u.x;
-    m.m[2] = -f.x;
+    m.m[MAT4_00] = s.x;
+    m.m[MAT4_10] = u.x;
+    m.m[MAT4_20] = -f.x;
 
-    m.m[4] = s.y;
-    m.m[5] = u.y;
-    m.m[6] = -f.y;
+    m.m[MAT4_01] = s.y;
+    m.m[MAT4_11] = u.y;
+    m.m[MAT4_21] = -f.y;
 
-    m.m[8]  = s.z;
-    m.m[9]  = u.z;
-    m.m[10] = -f.z;
+    m.m[MAT4_02] = s.z;
+    m.m[MAT4_12] = u.z;
+    m.m[MAT4_22] = -f.z;
 
-    m.m[12] = -vec3_dot(s, eye);
-    m.m[13] = -vec3_dot(u, eye);
-    m.m[14] =  vec3_dot(f, eye);
+    m.m[MAT4_03] = -vec3_dot(s, eye);
+    m.m[MAT4_13] = -vec3_dot(u, eye);
+    m.m[MAT4_23] =  vec3_dot(f, eye);
 
     return m;
 }
@@ -455,24 +455,24 @@ LINALG_DEF Mat4 mat4_perspective(float fov, float aspect, float znear, float zfa
     float f = 1.0f / tanf(fov * 0.5f);
 
     Mat4 m = {0};
-    m.m[0]  = f / aspect;
-    m.m[5]  = f;
-    m.m[10] = (zfar + znear) / (znear - zfar);
-    m.m[11] = -1.0f;
-    m.m[14] = (2.0f * zfar * znear) / (znear - zfar);
+    m.m[MAT4_00] = f / aspect;
+    m.m[MAT4_11] = f;
+    m.m[MAT4_22] = (zfar + znear) / (znear - zfar);
+    m.m[MAT4_32] = -1.0f;
+    m.m[MAT4_23] = (2.0f * zfar * znear) / (znear - zfar);
     return m;
 }
 
 LINALG_DEF Mat4 mat4_ortho(float l, float r, float b, float t, float n, float f) {
     Mat4 m = mat4_identity();
 
-    m.m[0]  = 2.0f / (r - l);
-    m.m[5]  = 2.0f / (t - b);
-    m.m[10] = -2.0f / (f - n);
+    m.m[MAT4_00] = 2.0f / (r - l);
+    m.m[MAT4_11] = 2.0f / (t - b);
+    m.m[MAT4_22] = -2.0f / (f - n);
 
-    m.m[12] = -(r + l) / (r - l);
-    m.m[13] = -(t + b) / (t - b);
-    m.m[14] = -(f + n) / (f - n);
+    m.m[MAT4_03] = -(r + l) / (r - l);
+    m.m[MAT4_13] = -(t + b) / (t - b);
+    m.m[MAT4_23] = -(f + n) / (f - n);
 
     return m;
 }
@@ -488,9 +488,9 @@ LINALG_DEF Mat4 mat4_transpose(Mat4 m) {
 LINALG_DEF Mat4 mat4_inverse(Mat4 m) {
     Mat4 r;
 
-    float a00 = m.m[0],  a01 = m.m[4],  a02 = m.m[8];
-    float a10 = m.m[1],  a11 = m.m[5],  a12 = m.m[9];
-    float a20 = m.m[2],  a21 = m.m[6],  a22 = m.m[10];
+    float a00 = m.m[MAT4_00], a01 = m.m[MAT4_01], a02 = m.m[MAT4_02];
+    float a10 = m.m[MAT4_10], a11 = m.m[MAT4_11], a12 = m.m[MAT4_12];
+    float a20 = m.m[MAT4_20], a21 = m.m[MAT4_21], a22 = m.m[MAT4_22];
 
     float det =
         a00*(a11*a22 - a12*a21) -
@@ -503,33 +503,33 @@ LINALG_DEF Mat4 mat4_inverse(Mat4 m) {
 
     float inv_det = 1.0f / det;
 
-    r.m[0]  =  (a11*a22 - a12*a21) * inv_det;
-    r.m[4]  = -(a01*a22 - a02*a21) * inv_det;
-    r.m[8]  =  (a01*a12 - a02*a11) * inv_det;
+    r.m[MAT4_00] =  (a11*a22 - a12*a21) * inv_det;
+    r.m[MAT4_01] = -(a01*a22 - a02*a21) * inv_det;
+    r.m[MAT4_02] =  (a01*a12 - a02*a11) * inv_det;
 
-    r.m[1]  = -(a10*a22 - a12*a20) * inv_det;
-    r.m[5]  =  (a00*a22 - a02*a20) * inv_det;
-    r.m[9]  = -(a00*a12 - a02*a10) * inv_det;
+    r.m[MAT4_10] = -(a10*a22 - a12*a20) * inv_det;
+    r.m[MAT4_11] =  (a00*a22 - a02*a20) * inv_det;
+    r.m[MAT4_12] = -(a00*a12 - a02*a10) * inv_det;
 
-    r.m[2]  =  (a10*a21 - a11*a20) * inv_det;
-    r.m[6]  = -(a00*a21 - a01*a20) * inv_det;
-    r.m[10] =  (a00*a11 - a01*a10) * inv_det;
+    r.m[MAT4_20] =  (a10*a21 - a11*a20) * inv_det;
+    r.m[MAT4_21] = -(a00*a21 - a01*a20) * inv_det;
+    r.m[MAT4_22] =  (a00*a11 - a01*a10) * inv_det;
 
     // last row
-    r.m[3] = r.m[7] = r.m[11] = 0.0f;
-    r.m[15] = 1.0f;
+    r.m[MAT4_30] = r.m[MAT4_31] = r.m[MAT4_32] = 0.0f;
+    r.m[MAT4_33] = 1.0f;
 
     // translation
-    Vec3 t = vec3_make(m.m[12], m.m[13], m.m[14]);
+    Vec3 t = vec3_make(m.m[MAT4_03], m.m[MAT4_13], m.m[MAT4_23]);
     Vec3 ti = vec3_make(
-        -(r.m[0]*t.x + r.m[4]*t.y + r.m[8]*t.z),
-        -(r.m[1]*t.x + r.m[5]*t.y + r.m[9]*t.z),
-        -(r.m[2]*t.x + r.m[6]*t.y + r.m[10]*t.z)
+        -(r.m[MAT4_00]*t.x + r.m[MAT4_01]*t.y + r.m[MAT4_02]*t.z),
+        -(r.m[MAT4_10]*t.x + r.m[MAT4_11]*t.y + r.m[MAT4_12]*t.z),
+        -(r.m[MAT4_20]*t.x + r.m[MAT4_21]*t.y + r.m[MAT4_22]*t.z)
     );
 
-    r.m[12] = ti.x;
-    r.m[13] = ti.y;
-    r.m[14] = ti.z;
+    r.m[MAT4_03] = ti.x;
+    r.m[MAT4_13] = ti.y;
+    r.m[MAT4_23] = ti.z;
 
     return r;
 }
@@ -613,17 +613,17 @@ LINALG_DEF Mat4 quat_to_mat4(Quat q) {
 
     Mat4 m = mat4_identity();
 
-    m.m[0]  = 1.0f - 2.0f * (yy + zz);
-    m.m[1]  = 2.0f * (xy + wz);
-    m.m[2]  = 2.0f * (xz - wy);
+    m.m[MAT4_00] = 1.0f - 2.0f * (yy + zz);
+    m.m[MAT4_10] = 2.0f * (xy + wz);
+    m.m[MAT4_20] = 2.0f * (xz - wy);
 
-    m.m[4]  = 2.0f * (xy - wz);
-    m.m[5]  = 1.0f - 2.0f * (xx + zz);
-    m.m[6]  = 2.0f * (yz + wx);
+    m.m[MAT4_01] = 2.0f * (xy - wz);
+    m.m[MAT4_11] = 1.0f - 2.0f * (xx + zz);
+    m.m[MAT4_21] = 2.0f * (yz + wx);
 
-    m.m[8]  = 2.0f * (xz + wy);
-    m.m[9]  = 2.0f * (yz - wx);
-    m.m[10] = 1.0f - 2.0f * (xx + yy);
+    m.m[MAT4_02] = 2.0f * (xz + wy);
+    m.m[MAT4_12] = 2.0f * (yz - wx);
+    m.m[MAT4_22] = 1.0f - 2.0f * (xx + yy);
 
     return m;
 }
