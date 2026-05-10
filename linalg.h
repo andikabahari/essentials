@@ -75,7 +75,12 @@ enum {
     MAT4_03, MAT4_13, MAT4_23, MAT4_33,
 };
 
+#define LINALG_EPSILON 1e-5
+
+#include <stdbool.h>
+
 LINALG_DEF Vec2 vec2_make(float x, float y);
+LINALG_DEF bool vec2_eq(Vec2 a, Vec2 b);
 LINALG_DEF Vec2 vec2_add(Vec2 a, Vec2 b);
 LINALG_DEF Vec2 vec2_sub(Vec2 a, Vec2 b);
 LINALG_DEF Vec2 vec2_neg(Vec2 v);
@@ -88,6 +93,7 @@ LINALG_DEF float vec2_length_sq(Vec2 v);
 LINALG_DEF Vec2 vec2_norm(Vec2 v);
 
 LINALG_DEF Vec3 vec3_make(float x, float y, float z);
+LINALG_DEF bool vec3_eq(Vec3 a, Vec3 b);
 LINALG_DEF Vec3 vec3_add(Vec3 a, Vec3 b);
 LINALG_DEF Vec3 vec3_sub(Vec3 a, Vec3 b);
 LINALG_DEF Vec3 vec3_neg(Vec3 v);
@@ -102,6 +108,7 @@ LINALG_DEF Vec3 vec3_norm(Vec3 v);
 LINALG_DEF Vec3 vec3_rotate_quat(Vec3 v, Quat q);
 
 LINALG_DEF Vec4 vec4_make(float x, float y, float z, float w);
+LINALG_DEF bool vec4_eq(Vec4 a, Vec4 b);
 LINALG_DEF Vec4 vec4_add(Vec4 a, Vec4 b);
 LINALG_DEF Vec4 vec4_sub(Vec4 a, Vec4 b);
 LINALG_DEF Vec4 vec4_neg(Vec4 v);
@@ -116,6 +123,7 @@ LINALG_DEF Vec4 vec4_norm(Vec4 v);
 // These are column-major, right-handed, column vectors,
 // i.e. result = M * v, and transforms compose as M = T * R * S
 LINALG_DEF Mat4 mat4_identity(void);
+LINALG_DEF bool mat4_eq(Mat4 a, Mat4 b);
 LINALG_DEF Mat4 mat4_add(Mat4 a, Mat4 b);
 LINALG_DEF Mat4 mat4_sub(Mat4 a, Mat4 b);
 LINALG_DEF Mat4 mat4_neg(Mat4 m);
@@ -136,6 +144,7 @@ LINALG_DEF Mat4 mat4_inverse(Mat4 m);
 // where quat_mul(a, b) means apply b then a (same convention as mat4_mul).
 LINALG_DEF Quat quat_make(float x, float y, float z, float w);
 LINALG_DEF Quat quat_identity(void);
+LINALG_DEF bool quat_eq(Quat a, Quat b);
 LINALG_DEF Quat quat_add(Quat a, Quat b);
 LINALG_DEF Quat quat_sub(Quat a, Quat b);
 LINALG_DEF Quat quat_neg(Quat q);
@@ -155,6 +164,8 @@ LINALG_DEF Transform transform_mul(Transform a, Transform b);
 #ifdef __cplusplus
 
 // Basic operations
+LINALG_DEF bool operator == (Vec2 a, Vec2 b);
+LINALG_DEF bool operator != (Vec2 a, Vec2 b);
 LINALG_DEF Vec2 operator + (Vec2 a, Vec2 b);
 LINALG_DEF Vec2 operator - (Vec2 a, Vec2 b);
 LINALG_DEF Vec2 operator - (Vec2 v); // negation 
@@ -173,6 +184,8 @@ LINALG_DEF Vec2 &operator /= (Vec2 &lhs, Vec2 rhs);
 LINALG_DEF Vec2 &operator /= (Vec2 &lhs, float rhs);
 
 // Basic operations
+LINALG_DEF bool operator == (Vec3 a, Vec3 b);
+LINALG_DEF bool operator != (Vec3 a, Vec3 b);
 LINALG_DEF Vec3 operator + (Vec3 a, Vec3 b);
 LINALG_DEF Vec3 operator - (Vec3 a, Vec3 b);
 LINALG_DEF Vec3 operator - (Vec3 v); // negation
@@ -191,6 +204,8 @@ LINALG_DEF Vec3 &operator /= (Vec3 &lhs, Vec3 rhs);
 LINALG_DEF Vec3 &operator /= (Vec3 &lhs, float rhs);
 
 // Basic operations
+LINALG_DEF bool operator == (Vec4 a, Vec4 b);
+LINALG_DEF bool operator != (Vec4 a, Vec4 b);
 LINALG_DEF Vec4 operator + (Vec4 a, Vec4 b);
 LINALG_DEF Vec4 operator - (Vec4 a, Vec4 b);
 LINALG_DEF Vec4 operator - (Vec4 v); // negation
@@ -209,6 +224,8 @@ LINALG_DEF Vec4 &operator /= (Vec4 &lhs, Vec4 rhs);
 LINALG_DEF Vec4 &operator /= (Vec4 &lhs, float rhs);
 
 // Basic operations
+LINALG_DEF bool operator == (Mat4 a, Mat4 b);
+LINALG_DEF bool operator != (Mat4 a, Mat4 b);
 LINALG_DEF Mat4 operator + (Mat4 a, Mat4 b);
 LINALG_DEF Mat4 operator - (Mat4 a, Mat4 b);
 LINALG_DEF Mat4 operator - (Mat4 m);
@@ -226,6 +243,8 @@ LINALG_DEF Mat4 &operator *= (Mat4 &lhs, float rhs);
 LINALG_DEF Mat4 &operator /= (Mat4 &lhs, float rhs);
 
 // Basic operations
+LINALG_DEF bool operator == (Quat a, Quat b);
+LINALG_DEF bool operator != (Quat a, Quat b);
 LINALG_DEF Quat operator + (Quat a, Quat b);
 LINALG_DEF Quat operator - (Quat a, Quat b);
 LINALG_DEF Quat operator - (Quat q);
@@ -252,11 +271,19 @@ LINALG_DEF Quat &operator /= (Quat &lhs, float rhs);
 
 #include <math.h>
 
+static inline bool __feq(float a, float b) {
+    return fabsf(a - b) <= LINALG_EPSILON;
+}
+
 LINALG_DEF Vec2 vec2_make(float x, float y) {
     Vec2 v;
     v.x = x;
     v.y = y;
     return v;
+}
+
+LINALG_DEF bool vec2_eq(Vec2 a, Vec2 b) {
+    return __feq(a.x, b.x) && __feq(a.y, b.y);
 }
 
 LINALG_DEF Vec2 vec2_add(Vec2 a, Vec2 b) {
@@ -307,6 +334,10 @@ LINALG_DEF Vec3 vec3_make(float x, float y, float z) {
     v.y = y;
     v.z = z;
     return v;
+}
+
+LINALG_DEF bool vec3_eq(Vec3 a, Vec3 b) {
+    return __feq(a.x, b.x) && __feq(a.y, b.y) && __feq(a.z, b.z);
 }
 
 LINALG_DEF Vec3 vec3_add(Vec3 a, Vec3 b) {
@@ -375,6 +406,13 @@ LINALG_DEF Vec4 vec4_make(float x, float y, float z, float w) {
     return v;
 }
 
+LINALG_DEF bool vec4_eq(Vec4 a, Vec4 b) {
+    return __feq(a.x, b.x) &&
+           __feq(a.y, b.y) &&
+           __feq(a.z, b.z) &&
+           __feq(a.w, b.w);
+}
+
 LINALG_DEF Vec4 vec4_add(Vec4 a, Vec4 b) {
     return vec4_make(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
 }
@@ -424,6 +462,13 @@ LINALG_DEF Mat4 mat4_identity(void) {
     m.m[MAT4_22] = 1.0f;
     m.m[MAT4_33] = 1.0f;
     return m;
+}
+
+LINALG_DEF bool mat4_eq(Mat4 a, Mat4 b) {
+    for (int i = 0; i < 16; ++i) {
+        if (!__feq(a.m[i], b.m[i])) return false;
+    }
+    return true;
 }
 
 LINALG_DEF Mat4 mat4_add(Mat4 a, Mat4 b) {
@@ -707,6 +752,13 @@ LINALG_DEF Quat quat_identity(void) {
     return quat_make(0.0f, 0.0f, 0.0f, 1.0f);
 }
 
+LINALG_DEF bool quat_eq(Quat a, Quat b) {
+    return __feq(a.x, b.x) &&
+           __feq(a.y, b.y) &&
+           __feq(a.z, b.z) &&
+           __feq(a.w, b.w);
+}
+
 LINALG_DEF Quat quat_add(Quat a, Quat b) {
     Quat r;
 
@@ -915,6 +967,14 @@ LINALG_DEF Transform transform_mul(Transform a, Transform b) {
 
 #ifdef __cplusplus
 
+LINALG_DEF bool operator == (Vec2 a, Vec2 b) {
+    return vec2_eq(a, b);
+}
+
+LINALG_DEF bool operator != (Vec2 a, Vec2 b) {
+    return !vec2_eq(a, b);
+}
+
 LINALG_DEF Vec2 operator + (Vec2 a, Vec2 b) {
     return vec2_add(a, b);
 }
@@ -975,6 +1035,14 @@ LINALG_DEF Vec2 &operator /= (Vec2 &lhs, Vec2 rhs) {
 LINALG_DEF Vec2 &operator /= (Vec2 &lhs, float rhs) {
     lhs = vec2_scale(lhs, 1.0f/rhs);
     return lhs;
+}
+
+LINALG_DEF bool operator == (Vec3 a, Vec3 b) {
+    return vec3_eq(a, b);
+}
+
+LINALG_DEF bool operator != (Vec3 a, Vec3 b) {
+    return !vec3_eq(a, b);
 }
 
 LINALG_DEF Vec3 operator + (Vec3 a, Vec3 b) {
@@ -1039,6 +1107,14 @@ LINALG_DEF Vec3 &operator /= (Vec3 &lhs, float rhs) {
     return lhs;
 }
 
+LINALG_DEF bool operator == (Vec4 a, Vec4 b) {
+    return vec4_eq(a, b);
+}
+
+LINALG_DEF bool operator != (Vec4 a, Vec4 b) {
+    return !vec4_eq(a, b);
+}
+
 LINALG_DEF Vec4 operator + (Vec4 a, Vec4 b) {
     return vec4_add(a, b);
 }
@@ -1101,6 +1177,14 @@ LINALG_DEF Vec4 &operator /= (Vec4 &lhs, float rhs) {
     return lhs;
 }
 
+LINALG_DEF bool operator == (Mat4 a, Mat4 b) {
+    return mat4_eq(a, b);
+}
+
+LINALG_DEF bool operator != (Mat4 a, Mat4 b) {
+    return !mat4_eq(a, b);
+}
+
 LINALG_DEF Mat4 operator + (Mat4 a, Mat4 b) {
     return mat4_add(a, b);
 }
@@ -1156,6 +1240,14 @@ LINALG_DEF Mat4 &operator *= (Mat4 &lhs, float rhs) {
 LINALG_DEF Mat4 &operator /= (Mat4 &lhs, float rhs) {
     lhs = mat4_mul_scalar(lhs, 1.0f/rhs);
     return lhs;
+}
+
+LINALG_DEF bool operator == (Quat a, Quat b) {
+    return quat_eq(a, b);
+}
+
+LINALG_DEF bool operator != (Quat a, Quat b) {
+    return !quat_eq(a, b);
 }
 
 LINALG_DEF Quat operator + (Quat a, Quat b) {

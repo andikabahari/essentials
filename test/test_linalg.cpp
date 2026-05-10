@@ -1,35 +1,7 @@
-const float EPS = 1e-5f;
 const float M_PI = 3.1415926f;
 
-inline int feq(float a, float b) {
-    return fabsf(a - b) < EPS;
-}
-
-inline int vec2_eq(Vec2 a, Vec2 b) {
-    return feq(a.x, b.x) && feq(a.y, b.y);
-}
-
-inline int vec3_eq(Vec3 a, Vec3 b) {
-    return feq(a.x, b.x) && feq(a.y, b.y) && feq(a.z, b.z);
-}
-
-inline int vec4_eq(Vec4 a, Vec4 b) {
-    return feq(a.x, b.x) && feq(a.y, b.y) &&
-           feq(a.z, b.z) && feq(a.w, b.w);
-}
-
-inline int mat4_eq(Mat4 a, Mat4 b) {
-    for (int i = 0; i < 16; ++i) {
-        if (!feq(a.m[i], b.m[i])) return 0;
-    }
-    return 1;
-}
-
-inline bool quat_eq(Quat a, Quat b) {
-    return feq(a.x, b.x)
-        && feq(a.y, b.y)
-        && feq(a.z, b.z)
-        && feq(a.w, b.w);
+inline bool feq(float a, float b) {
+    return fabsf(a - b) <= LINALG_EPSILON;
 }
 
 inline int mat4_is_identity(Mat4 m) {
@@ -72,14 +44,14 @@ TEST(test_vec2_ops) {
     Vec2 a = vec2_make(2, 4);
     Vec2 b = vec2_make(1, 2);
 
-    ASSERT(vec2_eq(a + b, vec2_make( 3,  6)));
-    ASSERT(vec2_eq(a - b, vec2_make( 1,  2)));
-    ASSERT(vec2_eq(  - a, vec2_make(-2, -4)));
-    ASSERT(vec2_eq(a * b, vec2_make( 2,  8)));
-    ASSERT(vec2_eq(a / b, vec2_make( 2,  2)));
-    ASSERT(vec2_eq(a * 2, vec2_make( 4,  8)));
-    ASSERT(vec2_eq(2 * a, vec2_make( 4,  8)));
-    ASSERT(vec2_eq(a / 2, vec2_make( 1,  2)));
+    ASSERT(!(a + b != vec2_make( 3,  6)));
+    ASSERT(a - b == vec2_make( 1,  2));
+    ASSERT(  - a == vec2_make(-2, -4));
+    ASSERT(a * b == vec2_make( 2,  8));
+    ASSERT(a / b == vec2_make( 2,  2));
+    ASSERT(a * 2 == vec2_make( 4,  8));
+    ASSERT(2 * a == vec2_make( 4,  8));
+    ASSERT(a / 2 == vec2_make( 1,  2));
 }
 
 TEST(test_vec2_ops_assignment) {
@@ -88,27 +60,27 @@ TEST(test_vec2_ops_assignment) {
 
     Vec2 x = a;
     x += b;
-    ASSERT(vec2_eq(x, vec2_make(3, 6)));
+    ASSERT(x == vec2_make(3, 6));
 
     x = a;
     x -= b;
-    ASSERT(vec2_eq(x, vec2_make(1, 2)));
+    ASSERT(x == vec2_make(1, 2));
 
     x = a;
     x *= b;
-    ASSERT(vec2_eq(x, vec2_make(2, 8)));
+    ASSERT(x == vec2_make(2, 8));
 
     x = a;
     x *= 2;
-    ASSERT(vec2_eq(x, vec2_make(4, 8)));
+    ASSERT(x == vec2_make(4, 8));
 
     x = a;
     x /= b;
-    ASSERT(vec2_eq(x, vec2_make(2, 2)));
+    ASSERT(x == vec2_make(2, 2));
 
     x = a;
     x /= 2;
-    ASSERT(vec2_eq(x, vec2_make(1, 2)));
+    ASSERT(x == vec2_make(1, 2));
 }
 
 TEST(test_vec3) {
@@ -127,14 +99,14 @@ TEST(test_vec3_ops) {
     Vec3 a = vec3_make(2, 4, 6);
     Vec3 b = vec3_make(1, 2, 3);
 
-    ASSERT(vec3_eq(a + b, vec3_make( 3,  6,  9)));
-    ASSERT(vec3_eq(a - b, vec3_make( 1,  2,  3)));
-    ASSERT(vec3_eq(  - a, vec3_make(-2, -4, -6)));
-    ASSERT(vec3_eq(a * b, vec3_make( 2,  8, 18)));
-    ASSERT(vec3_eq(a / b, vec3_make( 2,  2,  2)));
-    ASSERT(vec3_eq(a * 2, vec3_make( 4,  8, 12)));
-    ASSERT(vec3_eq(2 * a, vec3_make( 4,  8, 12)));
-    ASSERT(vec3_eq(a / 2, vec3_make( 1,  2,  3)));
+    ASSERT(!(a + b != vec3_make( 3,  6,  9)));
+    ASSERT(a - b == vec3_make( 1,  2,  3));
+    ASSERT(  - a == vec3_make(-2, -4, -6));
+    ASSERT(a * b == vec3_make( 2,  8, 18));
+    ASSERT(a / b == vec3_make( 2,  2,  2));
+    ASSERT(a * 2 == vec3_make( 4,  8, 12));
+    ASSERT(2 * a == vec3_make( 4,  8, 12));
+    ASSERT(a / 2 == vec3_make( 1,  2,  3));
 }
 
 TEST(test_vec3_ops_assignment) {
@@ -143,27 +115,27 @@ TEST(test_vec3_ops_assignment) {
 
     Vec3 x = a;
     x += b;
-    ASSERT(vec3_eq(x, vec3_make(3, 6, 9)));
+    ASSERT(x == vec3_make(3, 6, 9));
 
     x = a;
     x -= b;
-    ASSERT(vec3_eq(x, vec3_make(1, 2, 3)));
+    ASSERT(x == vec3_make(1, 2, 3));
 
     x = a;
     x *= b;
-    ASSERT(vec3_eq(x, vec3_make(2, 8, 18)));
+    ASSERT(x == vec3_make(2, 8, 18));
 
     x = a;
     x *= 2;
-    ASSERT(vec3_eq(x, vec3_make(4, 8, 12)));
+    ASSERT(x == vec3_make(4, 8, 12));
 
     x = a;
     x /= b;
-    ASSERT(vec3_eq(x, vec3_make(2, 2, 2)));
+    ASSERT(x == vec3_make(2, 2, 2));
 
     x = a;
     x /= 2;
-    ASSERT(vec3_eq(x, vec3_make(1, 2, 3)));
+    ASSERT(x == vec3_make(1, 2, 3));
 }
 
 TEST(test_vec3_cross_orthogonality) {
@@ -199,14 +171,14 @@ TEST(test_vec4_ops) {
     Vec4 a = vec4_make(2, 4, 6, 8);
     Vec4 b = vec4_make(1, 2, 3, 4);
 
-    ASSERT(vec4_eq(a + b, vec4_make( 3,  6,  9, 12)));
-    ASSERT(vec4_eq(a - b, vec4_make( 1,  2,  3,  4)));
-    ASSERT(vec4_eq(  - a, vec4_make(-2, -4, -6, -8)));
-    ASSERT(vec4_eq(a * b, vec4_make( 2,  8, 18, 32)));
-    ASSERT(vec4_eq(a / b, vec4_make( 2,  2,  2,  2)));
-    ASSERT(vec4_eq(a * 2, vec4_make( 4,  8, 12, 16)));
-    ASSERT(vec4_eq(2 * a, vec4_make( 4,  8, 12, 16)));
-    ASSERT(vec4_eq(a / 2, vec4_make( 1,  2,  3,  4)));
+    ASSERT(!(a + b != vec4_make( 3,  6,  9, 12)));
+    ASSERT(a - b == vec4_make( 1,  2,  3,  4));
+    ASSERT(  - a == vec4_make(-2, -4, -6, -8));
+    ASSERT(a * b == vec4_make( 2,  8, 18, 32));
+    ASSERT(a / b == vec4_make( 2,  2,  2,  2));
+    ASSERT(a * 2 == vec4_make( 4,  8, 12, 16));
+    ASSERT(2 * a == vec4_make( 4,  8, 12, 16));
+    ASSERT(a / 2 == vec4_make( 1,  2,  3,  4));
 }
 
 TEST(test_vec4_ops_assignment) {
@@ -215,27 +187,27 @@ TEST(test_vec4_ops_assignment) {
 
     Vec4 x = a;
     x += b;
-    ASSERT(vec4_eq(x, vec4_make(3, 6, 9, 12)));
+    ASSERT(x == vec4_make(3, 6, 9, 12));
 
     x = a;
     x -= b;
-    ASSERT(vec4_eq(x, vec4_make(1, 2, 3, 4)));
+    ASSERT(x == vec4_make(1, 2, 3, 4));
 
     x = a;
     x *= b;
-    ASSERT(vec4_eq(x, vec4_make(2, 8, 18, 32)));
+    ASSERT(x == vec4_make(2, 8, 18, 32));
 
     x = a;
     x *= 2;
-    ASSERT(vec4_eq(x, vec4_make(4, 8, 12, 16)));
+    ASSERT(x == vec4_make(4, 8, 12, 16));
 
     x = a;
     x /= b;
-    ASSERT(vec4_eq(x, vec4_make(2, 2, 2, 2)));
+    ASSERT(x == vec4_make(2, 2, 2, 2));
 
     x = a;
     x /= 2;
-    ASSERT(vec4_eq(x, vec4_make(1, 2, 3, 4)));
+    ASSERT(x == vec4_make(1, 2, 3, 4));
 }
 
 TEST(test_mat4) {
@@ -269,57 +241,60 @@ TEST(test_mat4_ops) {
          4,  3,  2,  1,
     }};
 
-    ASSERT(mat4_eq(a + b, {{
+    Mat4 expected = {{
         17, 17, 17, 17,
         17, 17, 17, 17,
         17, 17, 17, 17,
         17, 17, 17, 17,
-    }}));
+    }};
+    ASSERT(a + b == expected);
 
-    ASSERT(mat4_eq(a - b, {{
+    expected = {{
        -15, -13, -11,  -9,
         -7,  -5,  -3,  -1,
          1,   3,   5,   7,
          9,  11,  13,  15,
-    }}));
+    }};
+    ASSERT(!(a - b != expected));
 
-    ASSERT(mat4_eq(-a, {{
+    expected = {{
         -1,  -2,  -3,  -4,
         -5,  -6,  -7,  -8,
         -9, -10, -11, -12,
        -13, -14, -15, -16,
-    }}));
+    }};
+    ASSERT(-a == expected);
 
-    ASSERT(mat4_eq(a * 2.0f, {{
+    expected = {{
          2,  4,  6,  8,
         10, 12, 14, 16,
         18, 20, 22, 24,
         26, 28, 30, 32,
-    }}));
+    }};
+    ASSERT(a * 2.0f == expected);
 
-    ASSERT(mat4_eq(2.0f * a, {{
+    expected = {{
          2,  4,  6,  8,
         10, 12, 14, 16,
         18, 20, 22, 24,
         26, 28, 30, 32,
-    }}));
+    }};
+    ASSERT(2.0f * a == expected);
 
-    ASSERT(mat4_eq(a / 2.0f, {{
+    expected = {{
         0.5f, 1.0f, 1.5f, 2.0f,
         2.5f, 3.0f, 3.5f, 4.0f,
         4.5f, 5.0f, 5.5f, 6.0f,
         6.5f, 7.0f, 7.5f, 8.0f,
-    }}));
+    }};
+    ASSERT(a / 2.0f == expected);
 
     /* mat4 x vec4 */ {
         Mat4 t = mat4_translate(vec3_make(3, 4, 5));
 
         Vec4 v = vec4_make(1, 2, 3, 1);
 
-        ASSERT(vec4_eq(
-            t * v,
-            vec4_make(4, 6, 8, 1)
-        ));
+        ASSERT(t * v == vec4_make(4, 6, 8, 1));
     }
 
     /* mat4 x mat4 */ {
@@ -330,10 +305,7 @@ TEST(test_mat4_ops) {
 
         Vec4 v = vec4_make(1, 1, 1, 1);
 
-        ASSERT(vec4_eq(
-            m * v,
-            vec4_make(3, 4, 5, 1)
-        ));
+        ASSERT(m * v == vec4_make(3, 4, 5, 1));
     }
 }
 
@@ -355,47 +327,48 @@ TEST(test_mat4_ops_assignment) {
     Mat4 x = a;
 
     x += b;
-    ASSERT(mat4_eq(x, {{
+    Mat4 expected = {{
         17, 17, 17, 17,
         17, 17, 17, 17,
         17, 17, 17, 17,
         17, 17, 17, 17,
-    }}));
+    }};
+    ASSERT(x == expected);
 
     x = a;
     x -= b;
-    ASSERT(mat4_eq(x, {{
+    expected = {{
        -15, -13, -11,  -9,
         -7,  -5,  -3,  -1,
          1,   3,   5,   7,
          9,  11,  13,  15,
-    }}));
+    }};
+    ASSERT(x == expected);
 
     x = a;
     x *= 2.0f;
-    ASSERT(mat4_eq(x, {{
+    expected = {{
          2,  4,  6,  8,
         10, 12, 14, 16,
         18, 20, 22, 24,
         26, 28, 30, 32,
-    }}));
+    }};
+    ASSERT(x == expected);
 
     x = a;
     x /= 2.0f;
-    ASSERT(mat4_eq(x, {{
+    expected = {{
         0.5f, 1.0f, 1.5f, 2.0f,
         2.5f, 3.0f, 3.5f, 4.0f,
         4.5f, 5.0f, 5.5f, 6.0f,
         6.5f, 7.0f, 7.5f, 8.0f,
-    }}));
+    }};
+    ASSERT(x == expected);
 
     x = mat4_identity();
     x *= mat4_scaling(vec3_make(2, 3, 4));
 
-    ASSERT(vec4_eq(
-        x * vec4_make(1, 1, 1, 1),
-        vec4_make(2, 3, 4, 1)
-    ));
+    ASSERT(x * vec4_make(1, 1, 1, 1) == vec4_make(2, 3, 4, 1));
 }
 
 TEST(test_mat4_inverse) {
@@ -458,18 +431,13 @@ TEST(test_quat_ops) {
     Quat a = quat_make(1, 2, 3, 4);
     Quat b = quat_make(5, 6, 7, 8);
 
-    ASSERT(quat_eq(a + b, quat_make( 6,  8, 10, 12)));
-    ASSERT(quat_eq(a - b, quat_make(-4, -4, -4, -4)));
-    ASSERT(quat_eq(   -a, quat_make(-1, -2, -3, -4)));
+    ASSERT(!(a + b != quat_make( 6,  8, 10, 12)));
+    ASSERT(a - b == quat_make(-4, -4, -4, -4));
+    ASSERT(   -a == quat_make(-1, -2, -3, -4));
 
-    ASSERT(quat_eq(a * 2.0f,
-        quat_make(2, 4, 6, 8)));
-
-    ASSERT(quat_eq(2.0f * a,
-        quat_make(2, 4, 6, 8)));
-
-    ASSERT(quat_eq(a / 2.0f,
-        quat_make(0.5f, 1.0f, 1.5f, 2.0f)));
+    ASSERT(a * 2.0f == quat_make(2, 4, 6, 8));
+    ASSERT(2.0f * a == quat_make(2, 4, 6, 8));
+    ASSERT(a / 2.0f == quat_make(0.5f, 1.0f, 1.5f, 2.0f));
 
     /* quat x vec3 */ {
         Quat q = quat_from_axis_angle(
@@ -515,20 +483,19 @@ TEST(test_quat_ops_assignment) {
     Quat x = a;
 
     x += b;
-    ASSERT(quat_eq(x, quat_make( 6,  8, 10, 12)));
+    ASSERT(x == quat_make( 6,  8, 10, 12));
 
     x = a;
     x -= b;
-    ASSERT(quat_eq(x, quat_make(-4, -4, -4, -4)));
+    ASSERT(x == quat_make(-4, -4, -4, -4));
 
     x = a;
     x *= 2.0f;
-    ASSERT(quat_eq(x, quat_make(2, 4, 6, 8)));
+    ASSERT(x == quat_make(2, 4, 6, 8));
 
     x = a;
     x /= 2.0f;
-    ASSERT(quat_eq(x,
-        quat_make(0.5f, 1.0f, 1.5f, 2.0f)));
+    ASSERT(x ==quat_make(0.5f, 1.0f, 1.5f, 2.0f));
 
     x = quat_identity();
 
