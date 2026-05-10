@@ -1,4 +1,7 @@
 TEST(test_gfx) {
+    mem_set_allocation_proc(SDL_malloc, SDL_realloc, SDL_free);
+    defer (mem_set_allocation_proc(malloc, realloc, free));
+
     ASSERT(SDL_Init(SDL_INIT_VIDEO));
     defer(SDL_Quit());
 

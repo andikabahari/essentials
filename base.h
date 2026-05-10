@@ -356,15 +356,26 @@ template <typename F> gbprivDefer<F> gb__defer_func(F &&f) { return gbprivDefer<
 
 #define SWAP(T, a, b) do { T _swap_tmp_ = (a); (a) = (b); (b) = _swap_tmp_; } while(0)
 
-inline void *mem_alloc(isize size);
-inline void *mem_realloc(void *ptr, isize new_size);
-inline void *mem_copy(void *dest, const void *src, isize num_bytes);
-inline void mem_free(void *ptr);
-inline void mem_set(void *dest, i32 ch, isize count);
-inline i32  mem_compare(const void *a, const void *b, isize n);
+typedef void *(*Raw_Alloc_Proc) (size_t sz);
+typedef void *(*Raw_Resize_Proc)(void *ptr, size_t newsz);
+typedef void  (*Raw_Free_Proc)  (void *ptr);
 
-BASE_DEF isize mem_page_size();
-BASE_DEF isize mem_granularity();
+extern Raw_Alloc_Proc  mem_alloc_proc;
+extern Raw_Resize_Proc mem_resize_proc;
+extern Raw_Free_Proc   mem_free_proc;
+
+BASE_DEF void mem_set_allocation_proc(Raw_Alloc_Proc alloc_proc, Raw_Resize_Proc resize_proc, Raw_Free_Proc free_proc);
+
+BASE_DEF void *mem_alloc(isize sz);
+BASE_DEF void *mem_resize(void *ptr, isize newsz);
+BASE_DEF void mem_free(void *ptr);
+
+BASE_DEF void *mem_copy(void *dest, const void *src, isize num_bytes);
+BASE_DEF void mem_set(void *dest, i32 ch, isize count);
+BASE_DEF i32  mem_compare(const void *a, const void *b, isize n);
+
+BASE_DEF isize mem_page_size(void);
+BASE_DEF isize mem_granularity(void);
 
 BASE_DEF void *mem_reserve(isize size);
 BASE_DEF bool mem_commit(void *ptr, isize size);
@@ -487,12 +498,12 @@ struct String {
 // Example: printf("%.*s\n", FMT(s));
 #define FMT(s) (int)(s).len, (const char *)(s).data
 
-inline String string_make(u8 *str, isize len);
+BASE_DEF String string_make(u8 *str, isize len);
 
-inline String string_empty();
+BASE_DEF String string_empty();
 
-inline String string_from_cstr(const char *cstr);
-inline const char *string_to_cstr(Arena *arena, const String &s);
+BASE_DEF String string_from_cstr(const char *cstr);
+BASE_DEF const char *string_to_cstr(Arena *arena, const String &s);
 
 inline bool string_eq(const String &a, const String &b);
 inline bool string_ne(const String &a, const String &b);
@@ -616,37 +627,55 @@ void table_clear(Table<K, V> *t);
 // IMPLEMENTATION
 //
 
+#ifdef BASE_IMPLEMENTATION
+
 #include <stdlib.h>
 
 #if OS_WINDOWS
 #include <windows.h>
 #endif
 
+#endif // BASE_IMPLEMENTATION
+
 // Memory
 
-inline void *mem_alloc(isize size) {
-    return malloc(size);
+#ifdef BASE_IMPLEMENTATION
+
+Raw_Alloc_Proc  mem_alloc_proc  = malloc;
+Raw_Resize_Proc mem_resize_proc = realloc;
+Raw_Free_Proc   mem_free_proc   = free;
+
+BASE_DEF void mem_set_allocation_proc(Raw_Alloc_Proc alloc_proc, Raw_Resize_Proc resize_proc, Raw_Free_Proc free_proc) {
+    mem_alloc_proc  = alloc_proc;
+    mem_resize_proc = resize_proc;
+    mem_free_proc   = free_proc;
 }
 
-inline void *mem_realloc(void *ptr, isize new_size) {
-    return realloc(ptr, new_size);
+BASE_DEF void *mem_alloc(isize sz) {
+    return mem_alloc_proc(sz);
 }
 
-inline void *mem_copy(void *dest, const void *src, isize num_bytes) {
+BASE_DEF void *mem_resize(void *ptr, isize newsz) {
+    return mem_resize_proc(ptr, newsz);
+}
+
+BASE_DEF void mem_free(void *ptr) {
+    mem_free_proc(ptr);
+}
+
+BASE_DEF void *mem_copy(void *dest, const void *src, isize num_bytes) {
     return memcpy(dest, src, num_bytes);
 }
 
-inline void mem_free(void *ptr) {
-    free(ptr);
-}
-
-inline void mem_set(void *dest, i32 ch, isize count) {
+BASE_DEF void mem_set(void *dest, i32 ch, isize count) {
     memset(dest, ch, count);
 }
 
-inline i32 mem_compare(const void *a, const void *b, isize n) {
+BASE_DEF i32 mem_compare(const void *a, const void *b, isize n) {
     return memcmp(a, b, n);
 }
+
+#endif // BASE_IMPLEMENTATION
 
 #ifdef BASE_IMPLEMENTATION
 
@@ -696,7 +725,7 @@ BASE_DEF bool mem_release(void *ptr) {
     return VirtualFree(ptr, 0, MEM_RELEASE) != 0;
 }
 
-#endif
+#endif // OS_WINDOWS
 
 #endif // BASE_IMPLEMENTATION
 
@@ -907,7 +936,7 @@ void array_reserve(Array<T> *arr, isize new_cap) {
         isize new_size = new_cap * sizeof(T);
 
         if (arr->data) {
-            void *ptr = mem_realloc(arr->data, new_size);
+            void *ptr = mem_resize(arr->data, new_size);
             ASSERT(ptr != NULL);
             arr->data = (T *)ptr;
         } else {
@@ -962,25 +991,29 @@ void array_unordered_remove(Array<T> *arr, isize index) {
 
 // Strings
 
-inline String string_make(u8 *str, isize len) {
+#ifdef BASE_IMPLEMENTATION
+
+BASE_DEF String string_make(u8 *str, isize len) {
     ASSERT(len >= 0);
     return String{ str, len };
 }
 
-inline String string_empty() {
+BASE_DEF String string_empty() {
     return string_make((u8 *)NULL, 0);
 }
 
-inline String string_from_cstr(const char *cstr) {
+BASE_DEF String string_from_cstr(const char *cstr) {
     return string_make((u8 *)cstr, (isize)strlen(cstr));
 }
 
-inline const char *string_to_cstr(Arena *arena, const String &s) {
+BASE_DEF const char *string_to_cstr(Arena *arena, const String &s) {
     char *buf = (char *)arena_push(arena, s.len + 1);
     mem_copy(buf, s.data, s.len);
     buf[s.len] = 0;
     return buf;
 }
+
+#endif // BASE_IMPLEMENTATION
 
 inline bool string_eq(const String &a, const String &b) { return a.len == b.len && mem_compare(a.data, b.data, a.len) == 0; }
 inline bool string_ne(const String &a, const String &b) { return !string_eq(a,b); }
