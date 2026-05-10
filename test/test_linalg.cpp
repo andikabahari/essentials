@@ -25,6 +25,13 @@ inline int mat4_eq(Mat4 a, Mat4 b) {
     return 1;
 }
 
+inline bool quat_eq(Quat a, Quat b) {
+    return feq(a.x, b.x)
+        && feq(a.y, b.y)
+        && feq(a.z, b.z)
+        && feq(a.w, b.w);
+}
+
 inline int mat4_is_identity(Mat4 m) {
     Mat4 I = mat4_identity();
     for (int i = 0; i < 16; ++i) {
@@ -247,6 +254,150 @@ TEST(test_mat4) {
     ASSERT(feq(M.m[10], 2.0f));
 }
 
+TEST(test_mat4_ops) {
+    Mat4 a = {{
+         1,  2,  3,  4,
+         5,  6,  7,  8,
+         9, 10, 11, 12,
+        13, 14, 15, 16,
+    }};
+
+    Mat4 b = {{
+        16, 15, 14, 13,
+        12, 11, 10,  9,
+         8,  7,  6,  5,
+         4,  3,  2,  1,
+    }};
+
+    ASSERT(mat4_eq(a + b, {{
+        17, 17, 17, 17,
+        17, 17, 17, 17,
+        17, 17, 17, 17,
+        17, 17, 17, 17,
+    }}));
+
+    ASSERT(mat4_eq(a - b, {{
+       -15, -13, -11,  -9,
+        -7,  -5,  -3,  -1,
+         1,   3,   5,   7,
+         9,  11,  13,  15,
+    }}));
+
+    ASSERT(mat4_eq(-a, {{
+        -1,  -2,  -3,  -4,
+        -5,  -6,  -7,  -8,
+        -9, -10, -11, -12,
+       -13, -14, -15, -16,
+    }}));
+
+    ASSERT(mat4_eq(a * 2.0f, {{
+         2,  4,  6,  8,
+        10, 12, 14, 16,
+        18, 20, 22, 24,
+        26, 28, 30, 32,
+    }}));
+
+    ASSERT(mat4_eq(2.0f * a, {{
+         2,  4,  6,  8,
+        10, 12, 14, 16,
+        18, 20, 22, 24,
+        26, 28, 30, 32,
+    }}));
+
+    ASSERT(mat4_eq(a / 2.0f, {{
+        0.5f, 1.0f, 1.5f, 2.0f,
+        2.5f, 3.0f, 3.5f, 4.0f,
+        4.5f, 5.0f, 5.5f, 6.0f,
+        6.5f, 7.0f, 7.5f, 8.0f,
+    }}));
+
+    /* mat4 x vec4 */ {
+        Mat4 t = mat4_translate(vec3_make(3, 4, 5));
+
+        Vec4 v = vec4_make(1, 2, 3, 1);
+
+        ASSERT(vec4_eq(
+            t * v,
+            vec4_make(4, 6, 8, 1)
+        ));
+    }
+
+    /* mat4 x mat4 */ {
+        Mat4 s = mat4_scaling(vec3_make(2, 2, 2));
+        Mat4 t = mat4_translate(vec3_make(1, 2, 3));
+
+        Mat4 m = t * s;
+
+        Vec4 v = vec4_make(1, 1, 1, 1);
+
+        ASSERT(vec4_eq(
+            m * v,
+            vec4_make(3, 4, 5, 1)
+        ));
+    }
+}
+
+TEST(test_mat4_ops_assignment) {
+    Mat4 a = {{
+         1,  2,  3,  4,
+         5,  6,  7,  8,
+         9, 10, 11, 12,
+        13, 14, 15, 16,
+    }};
+
+    Mat4 b = {{
+        16, 15, 14, 13,
+        12, 11, 10,  9,
+         8,  7,  6,  5,
+         4,  3,  2,  1,
+    }};
+
+    Mat4 x = a;
+
+    x += b;
+    ASSERT(mat4_eq(x, {{
+        17, 17, 17, 17,
+        17, 17, 17, 17,
+        17, 17, 17, 17,
+        17, 17, 17, 17,
+    }}));
+
+    x = a;
+    x -= b;
+    ASSERT(mat4_eq(x, {{
+       -15, -13, -11,  -9,
+        -7,  -5,  -3,  -1,
+         1,   3,   5,   7,
+         9,  11,  13,  15,
+    }}));
+
+    x = a;
+    x *= 2.0f;
+    ASSERT(mat4_eq(x, {{
+         2,  4,  6,  8,
+        10, 12, 14, 16,
+        18, 20, 22, 24,
+        26, 28, 30, 32,
+    }}));
+
+    x = a;
+    x /= 2.0f;
+    ASSERT(mat4_eq(x, {{
+        0.5f, 1.0f, 1.5f, 2.0f,
+        2.5f, 3.0f, 3.5f, 4.0f,
+        4.5f, 5.0f, 5.5f, 6.0f,
+        6.5f, 7.0f, 7.5f, 8.0f,
+    }}));
+
+    x = mat4_identity();
+    x *= mat4_scaling(vec3_make(2, 3, 4));
+
+    ASSERT(vec4_eq(
+        x * vec4_make(1, 1, 1, 1),
+        vec4_make(2, 3, 4, 1)
+    ));
+}
+
 TEST(test_mat4_inverse) {
     Mat4 m = mat4_rotate(1.0f, vec3_make(1,0,0));
     Mat4 inv = mat4_inverse(m);
@@ -301,6 +452,96 @@ TEST(test_quat) {
     Quat qn = quat_norm(qx);
     float len = sqrtf(qn.x*qn.x + qn.y*qn.y + qn.z*qn.z + qn.w*qn.w);
     ASSERT(feq(len, 1.0f));
+}
+
+TEST(test_quat_ops) {
+    Quat a = quat_make(1, 2, 3, 4);
+    Quat b = quat_make(5, 6, 7, 8);
+
+    ASSERT(quat_eq(a + b, quat_make( 6,  8, 10, 12)));
+    ASSERT(quat_eq(a - b, quat_make(-4, -4, -4, -4)));
+    ASSERT(quat_eq(   -a, quat_make(-1, -2, -3, -4)));
+
+    ASSERT(quat_eq(a * 2.0f,
+        quat_make(2, 4, 6, 8)));
+
+    ASSERT(quat_eq(2.0f * a,
+        quat_make(2, 4, 6, 8)));
+
+    ASSERT(quat_eq(a / 2.0f,
+        quat_make(0.5f, 1.0f, 1.5f, 2.0f)));
+
+    /* quat x vec3 */ {
+        Quat q = quat_from_axis_angle(
+            vec3_make(0, 0, 1),
+            M_PI * 0.5f
+        );
+
+        Vec3 v = vec3_make(1, 0, 0);
+
+        Vec3 r = q * v;
+
+        ASSERT(feq(r.x, 0.0f));
+        ASSERT(feq(r.y, 1.0f));
+        ASSERT(feq(r.z, 0.0f));
+    }
+
+    /* quat x quat */ {
+        Quat q1 = quat_from_axis_angle(
+            vec3_make(0, 0, 1),
+            M_PI * 0.5f
+        );
+
+        Quat q2 = quat_from_axis_angle(
+            vec3_make(0, 0, 1),
+            M_PI * 0.5f
+        );
+
+        Quat q = q1 * q2;
+
+        Vec3 v = vec3_make(1, 0, 0);
+        Vec3 r = q * v;
+
+        ASSERT(feq(r.x, -1.0f));
+        ASSERT(feq(r.y,  0.0f));
+        ASSERT(feq(r.z,  0.0f));
+    }
+}
+
+TEST(test_quat_ops_assignment) {
+    Quat a = quat_make(1, 2, 3, 4);
+    Quat b = quat_make(5, 6, 7, 8);
+
+    Quat x = a;
+
+    x += b;
+    ASSERT(quat_eq(x, quat_make( 6,  8, 10, 12)));
+
+    x = a;
+    x -= b;
+    ASSERT(quat_eq(x, quat_make(-4, -4, -4, -4)));
+
+    x = a;
+    x *= 2.0f;
+    ASSERT(quat_eq(x, quat_make(2, 4, 6, 8)));
+
+    x = a;
+    x /= 2.0f;
+    ASSERT(quat_eq(x,
+        quat_make(0.5f, 1.0f, 1.5f, 2.0f)));
+
+    x = quat_identity();
+
+    x *= quat_from_axis_angle(
+        vec3_make(0, 0, 1),
+        M_PI * 0.5f
+    );
+
+    Vec3 r = x * vec3_make(1, 0, 0);
+
+    ASSERT(feq(r.x, 0.0f));
+    ASSERT(feq(r.y, 1.0f));
+    ASSERT(feq(r.z, 0.0f));
 }
 
 TEST(test_quat_norm_invariant) {

@@ -122,11 +122,15 @@ int main() {
     RUN_TEST(test_vec4_ops);
     RUN_TEST(test_vec4_ops_assignment);
     RUN_TEST(test_mat4);
+    RUN_TEST(test_mat4_ops);
+    RUN_TEST(test_mat4_ops_assignment);
     RUN_TEST(test_mat4_inverse);
     RUN_TEST(test_mat4_inverse2);
     RUN_TEST(test_mat4_look_at);
     RUN_TEST(test_mat4_perspective_sanity);
     RUN_TEST(test_quat);
+    RUN_TEST(test_quat_ops);
+    RUN_TEST(test_quat_ops_assignment);
     RUN_TEST(test_quat_norm_invariant);
     RUN_TEST(test_quat_rotation_preserves_length);
     RUN_TEST(test_quat_slerp_endpoints);
