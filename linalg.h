@@ -79,6 +79,10 @@ enum {
 
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 LINALG_DEF Vec2 vec2_make(float x, float y);
 LINALG_DEF bool vec2_eq(Vec2 a, Vec2 b);
 LINALG_DEF Vec2 vec2_add(Vec2 a, Vec2 b);
@@ -160,6 +164,10 @@ LINALG_DEF Quat quat_slerp(Quat a, Quat b, float t);
 LINALG_DEF Transform transform_make(Vec3 pos, Quat rot, Vec3 scale);
 LINALG_DEF Mat4 transform_to_mat4(Transform t);
 LINALG_DEF Transform transform_mul(Transform a, Transform b);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #ifdef __cplusplus
 
@@ -270,6 +278,10 @@ LINALG_DEF Quat &operator /= (Quat &lhs, float rhs);
 #ifdef LINALG_IMPLEMENTATION
 
 #include <math.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 static inline bool __feq(float a, float b) {
     return fabsf(a - b) <= LINALG_EPSILON;
@@ -964,6 +976,10 @@ LINALG_DEF Transform transform_mul(Transform a, Transform b) {
 
     return r;
 }
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #ifdef __cplusplus
 
