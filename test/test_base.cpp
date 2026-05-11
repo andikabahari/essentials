@@ -52,7 +52,7 @@ TEST(test_defer_return) {
     ASSERT(r == 0);
 }
 
-global_var bool freed = false;
+global bool freed = false;
 
 internal void fake_free(void *) {
     freed = true;

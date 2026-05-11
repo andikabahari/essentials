@@ -1,16 +1,16 @@
 TEST(test_gfx) {
-    mem_set_allocation_proc(SDL_malloc, SDL_realloc, SDL_free);
-    defer (mem_set_allocation_proc(malloc, realloc, free));
+    mem_set_allocation_procs(SDL_malloc, SDL_realloc, SDL_free);
+    defer (mem_set_allocation_procs(malloc, realloc, free));
 
     ASSERT(SDL_Init(SDL_INIT_VIDEO));
-    defer(SDL_Quit());
+    defer (SDL_Quit());
 
     SDL_Window *window = SDL_CreateWindow("test_gfx", 800, 600, 0);
     ASSERT(window);
-    defer(SDL_DestroyWindow(window));
+    defer (SDL_DestroyWindow(window));
 
     ASSERT(gfx_init(window));
-    defer(gfx_quit());
+    defer (gfx_quit());
 
     bool keep_running = true;
     SDL_Event event;

@@ -137,7 +137,7 @@
 
 #define local_persist static // Local persisting variable
 #define internal      static // Internal linkage
-#define global_var    static // Global variable
+#define global    static // Global variable
 
 // OS detection
 
@@ -356,31 +356,31 @@ template <typename F> gbprivDefer<F> gb__defer_func(F &&f) { return gbprivDefer<
 
 #define SWAP(T, a, b) do { T _swap_tmp_ = (a); (a) = (b); (b) = _swap_tmp_; } while(0)
 
-typedef void *(*Raw_Alloc_Proc) (size_t sz);
-typedef void *(*Raw_Resize_Proc)(void *ptr, size_t newsz);
-typedef void  (*Raw_Free_Proc)  (void *ptr);
+typedef void *Raw_Alloc_Proc (size_t sz);
+typedef void *Raw_Resize_Proc(void *ptr, size_t newsz);
+typedef void  Raw_Free_Proc  (void *ptr);
 
-extern Raw_Alloc_Proc  mem_alloc_proc;
-extern Raw_Resize_Proc mem_resize_proc;
-extern Raw_Free_Proc   mem_free_proc;
-
-BASE_DEF void mem_set_allocation_proc(Raw_Alloc_Proc alloc_proc, Raw_Resize_Proc resize_proc, Raw_Free_Proc free_proc);
+BASE_DEF void mem_set_allocation_procs(Raw_Alloc_Proc *alloc_proc, Raw_Resize_Proc *resize_proc, Raw_Free_Proc *free_proc);
 
 BASE_DEF void *mem_alloc(isize sz);
 BASE_DEF void *mem_resize(void *ptr, isize newsz);
-BASE_DEF void mem_free(void *ptr);
+BASE_DEF void  mem_free(void *ptr);
 
-BASE_DEF void *mem_copy(void *dest, const void *src, isize num_bytes);
-BASE_DEF void mem_set(void *dest, i32 ch, isize count);
-BASE_DEF i32  mem_compare(const void *a, const void *b, isize n);
+#include <string.h>
+
+#define mem_copy    memcpy
+#define mem_set     memset
+#define mem_compare memcmp
 
 BASE_DEF isize mem_page_size(void);
 BASE_DEF isize mem_granularity(void);
 
-BASE_DEF void *mem_reserve(isize size);
-BASE_DEF bool mem_commit(void *ptr, isize size);
-BASE_DEF bool mem_decommit(void *ptr, isize size);
-BASE_DEF bool mem_release(void *ptr);
+#if 0 // vmem
+BASE_DEF void *vmem_reserve(isize size);
+BASE_DEF bool  vmem_commit(void *ptr, isize size);
+BASE_DEF bool  vmem_decommit(void *ptr, isize size);
+BASE_DEF bool  vmem_release(void *ptr);
+#endif
 
 // Arena
 
@@ -641,11 +641,11 @@ void table_clear(Table<K, V> *t);
 
 #ifdef BASE_IMPLEMENTATION
 
-Raw_Alloc_Proc  mem_alloc_proc  = malloc;
-Raw_Resize_Proc mem_resize_proc = realloc;
-Raw_Free_Proc   mem_free_proc   = free;
+global Raw_Alloc_Proc  *mem_alloc_proc  = malloc;
+global Raw_Resize_Proc *mem_resize_proc = realloc;
+global Raw_Free_Proc   *mem_free_proc   = free;
 
-BASE_DEF void mem_set_allocation_proc(Raw_Alloc_Proc alloc_proc, Raw_Resize_Proc resize_proc, Raw_Free_Proc free_proc) {
+BASE_DEF void mem_set_allocation_procs(Raw_Alloc_Proc *alloc_proc, Raw_Resize_Proc *resize_proc, Raw_Free_Proc *free_proc) {
     mem_alloc_proc  = alloc_proc;
     mem_resize_proc = resize_proc;
     mem_free_proc   = free_proc;
@@ -663,25 +663,13 @@ BASE_DEF void mem_free(void *ptr) {
     mem_free_proc(ptr);
 }
 
-BASE_DEF void *mem_copy(void *dest, const void *src, isize num_bytes) {
-    return memcpy(dest, src, num_bytes);
-}
-
-BASE_DEF void mem_set(void *dest, i32 ch, isize count) {
-    memset(dest, ch, count);
-}
-
-BASE_DEF i32 mem_compare(const void *a, const void *b, isize n) {
-    return memcmp(a, b, n);
-}
-
 #endif // BASE_IMPLEMENTATION
 
 #ifdef BASE_IMPLEMENTATION
 
 #if OS_WINDOWS
 
-BASE_DEF isize mem_page_size() {
+BASE_DEF isize mem_page_size(void) {
     local_persist isize result = 0;
     if (result == 0) {
         SYSTEM_INFO sysinfo = {};
@@ -691,7 +679,7 @@ BASE_DEF isize mem_page_size() {
     return result;
 }
 
-BASE_DEF isize mem_granularity() {
+BASE_DEF isize mem_granularity(void) {
     local_persist isize result = 0;
     if (result == 0) {
         SYSTEM_INFO sysinfo = {};
@@ -701,12 +689,13 @@ BASE_DEF isize mem_granularity() {
     return result;
 }
 
-BASE_DEF void *mem_reserve(isize size) {
+#if 0 // vmem
+BASE_DEF void *vmem_reserve(isize size) {
     size = ALIGN_UP(size, mem_page_size());
     return VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
 }
 
-BASE_DEF bool mem_commit(void *ptr, isize size) {
+BASE_DEF bool vmem_commit(void *ptr, isize size) {
     ASSERT(ptr);
     size = ALIGN_UP(size, mem_page_size());
     void *ret = VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE);
@@ -714,16 +703,17 @@ BASE_DEF bool mem_commit(void *ptr, isize size) {
     return ret != NULL;
 }
 
-BASE_DEF bool mem_decommit(void *ptr, isize size) {
+BASE_DEF bool vmem_decommit(void *ptr, isize size) {
     ASSERT(ptr);
     size = ALIGN_UP(size, mem_page_size());
     return VirtualFree(ptr, size, MEM_DECOMMIT) != 0;
 }
 
-BASE_DEF bool mem_release(void *ptr) {
+BASE_DEF bool vmem_release(void *ptr) {
     ASSERT(ptr);
     return VirtualFree(ptr, 0, MEM_RELEASE) != 0;
 }
+#endif
 
 #endif // OS_WINDOWS
 
@@ -734,23 +724,37 @@ BASE_DEF bool mem_release(void *ptr) {
 #ifdef BASE_IMPLEMENTATION
 
 BASE_DEF Arena *arena_create(isize reserve_size, isize commit_size) {
+#if 0 // vmem
     isize page_size = mem_page_size();
-    isize gran = mem_granularity();
-    reserve_size = ALIGN_UP(reserve_size, gran);
-    commit_size = ALIGN_UP(commit_size, page_size);
+    isize gran      = mem_granularity();
 
-    Arena *a = (Arena *)mem_reserve(reserve_size);
-    ASSERT(mem_commit(a, commit_size) == true);
+    reserve_size = ALIGN_UP(reserve_size, gran);
+    commit_size  = ALIGN_UP(commit_size, page_size);
+
+    Arena *a = (Arena *)vmem_reserve(reserve_size);
+    ASSERT(vmem_commit(a, commit_size));
+#else
+    reserve_size = ALIGN_UP(reserve_size, ARENA_ALIGN);
+    commit_size  = ALIGN_UP(commit_size, ARENA_ALIGN);
+
+    Arena *a = (Arena *)mem_alloc(reserve_size);
+    ASSERT(a);
+#endif
 
     a->reserve_size = reserve_size;
-    a->commit_size = commit_size;
-    a->pos = ARENA_BASE_POS;
-    a->commit_pos = commit_size;
+    a->commit_size  = commit_size;
+    a->pos          = ARENA_BASE_POS;
+    a->commit_pos   = commit_size;
+
     return a;
 }
 
 BASE_DEF void arena_destroy(Arena *a) {
-    mem_release(a);
+#if 0 // vmem
+    vmem_release(a);
+#else
+    mem_free(a);
+#endif
 }
 
 BASE_DEF void *arena_push(Arena *a, isize size, bool non_zero) {
@@ -760,14 +764,14 @@ BASE_DEF void *arena_push(Arena *a, isize size, bool non_zero) {
     if (new_pos > a->reserve_size) return NULL;
 
     if (new_pos > a->commit_pos) {
-        isize new_commit_pos = new_pos;
-        new_commit_pos += a->commit_size - 1;
-        new_commit_pos -= new_commit_pos % a->commit_size;
-        new_commit_pos = MIN(new_commit_pos, a->reserve_size);
+        isize new_pos_aligned = ALIGN_UP(new_pos, a->commit_size);
+        isize new_commit_pos = MIN(new_pos_aligned, a->reserve_size);
 
+#if 0 // vmem
         u8 *mem = (u8 *)a + a->commit_pos;
         isize commit_size = new_commit_pos - a->commit_pos;
-        ASSERT(mem_commit(mem, commit_size) == true);
+        ASSERT(vmem_commit(mem, commit_size));
+#endif
 
         a->commit_pos = new_commit_pos;
     }
