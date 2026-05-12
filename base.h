@@ -356,6 +356,8 @@ template <typename F> gbprivDefer<F> gb__defer_func(F &&f) { return gbprivDefer<
 
 #define SWAP(T, a, b) do { T _swap_tmp_ = (a); (a) = (b); (b) = _swap_tmp_; } while(0)
 
+#define DEFAULT_MEMORY_ALIGNMENT (2 * sizeof(void *))
+
 typedef void *Raw_Alloc_Proc (size_t sz);
 typedef void *Raw_Resize_Proc(void *ptr, size_t newsz);
 typedef void  Raw_Free_Proc  (void *ptr);
@@ -381,6 +383,38 @@ BASE_DEF bool  vmem_commit(void *ptr, isize size);
 BASE_DEF bool  vmem_decommit(void *ptr, isize size);
 BASE_DEF bool  vmem_release(void *ptr);
 #endif
+
+// Custom allocation
+
+enum Allocation_Mode {
+    ALLOCATION_ALLOC,
+    ALLOCATION_RESIZE,
+    ALLOCATION_FREE,
+    ALLOCATION_FREE_ALL,
+};
+
+#define ALLOCATOR_PROC(name)\
+    void *name(void *alloc_data, Allocation_Mode alloc_mode,\
+               isize newsz, isize alignment,\
+               void *oldmem, isize oldsz)
+
+typedef ALLOCATOR_PROC(Allocator_Proc);
+
+struct Allocator {
+    Allocator_Proc *proc;
+    void *data;
+};
+
+BASE_DEF void *allocator_alloc(Allocator a, isize sz);
+BASE_DEF void *allocator_resize(Allocator a, void *ptr, isize oldsz, isize newsz);
+BASE_DEF void  allocator_free(Allocator a, void *ptr);
+BASE_DEF void  allocator_free_all(Allocator a);
+
+BASE_DEF Allocator heap_allocator(void);
+BASE_DEF ALLOCATOR_PROC(heap_allocator_proc);
+
+#define heap_alloc(sz) allocator_alloc(heap_allocator(), sz)
+#define heap_free(ptr) allocator_free(heap_allocator(), ptr)
 
 // Arena
 
@@ -848,6 +882,57 @@ BASE_DEF void release_scratch_arena(Temp_Arena scratch) {
 }
 
 #endif // BASE_IMPLEMENTATION
+
+// Custom allocation
+
+BASE_DEF void *allocator_alloc(Allocator a, isize sz) {
+    return a.proc(a.data, ALLOCATION_ALLOC, sz, DEFAULT_MEMORY_ALIGNMENT, NULL, 0);
+}
+
+BASE_DEF void *allocator_resize(Allocator a, void *ptr, isize oldsz, isize newsz) {
+    return a.proc(a.data, ALLOCATION_RESIZE, newsz, DEFAULT_MEMORY_ALIGNMENT, ptr, oldsz);
+}
+
+BASE_DEF void allocator_free(Allocator a, void *ptr) {
+    if (ptr) {
+        a.proc(a.data, ALLOCATION_FREE, 0, 0, ptr, 0);
+    }
+}
+
+BASE_DEF void allocator_free_all(Allocator a) {
+    a.proc(a.data, ALLOCATION_FREE_ALL, 0, 0, NULL, 0);
+}
+
+BASE_DEF Allocator heap_allocator(void) {
+    Allocator a;
+    a.proc = heap_allocator_proc;
+    a.data = NULL;
+    return a;
+}
+
+BASE_DEF ALLOCATOR_PROC(heap_allocator_proc) {
+    UNUSED(alignment);
+    UNUSED(oldsz);
+
+    void *ptr = NULL;
+
+    switch (alloc_mode) {
+        case ALLOCATION_ALLOC:
+            ptr = mem_alloc(newsz);
+            break;
+        case ALLOCATION_RESIZE:
+            ptr = mem_resize(oldmem, newsz);
+            break;
+        case ALLOCATION_FREE:
+            mem_free(oldmem);
+            break;
+        case ALLOCATION_FREE_ALL:
+            // nothing
+            break;
+    }
+
+    return ptr;
+}
 
 // Arrays
 

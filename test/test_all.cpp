@@ -34,6 +34,8 @@ internal Arena *make_arena() {
 #include "test_gfx.cpp"
 
 int main() {
+    mem_set_allocation_procs(SDL_malloc, SDL_realloc, SDL_free);
+
     //
     // base.h test cases
     //
