@@ -54,9 +54,9 @@
 //       arena_destroy(arena);
 //
 //     Per-thread scratch arena for temporary allocation:
-//       Temp_Arena temp = acquire_scratch_arena();
+//       Arena_Temp temp = arena_scratch_begin();
 //       PUSH_MANY(temp.arena, u8, 100);
-//       release_scratch_arena(temp);
+//       arena_scratch_end(temp);
 //
 //   Arrays
 //
@@ -384,6 +384,47 @@ BASE_DEF bool  vmem_decommit(void *ptr, isize size);
 BASE_DEF bool  vmem_release(void *ptr);
 #endif
 
+// Arena
+
+#define ARENA_BASE_POS ALIGN_UP(sizeof(Arena), ARENA_ALIGN)
+#define ARENA_ALIGN (sizeof(void *))
+
+struct Arena {
+    isize reserve_size;
+    isize commit_size;
+    isize pos;
+    isize commit_pos;
+};
+
+BASE_DEF Arena *arena_create(isize reserve_size, isize commit_size);
+BASE_DEF void   arena_destroy(Arena *a);
+BASE_DEF void  *arena_push(Arena *a, isize size, bool non_zero = false);
+BASE_DEF void   arena_pop(Arena *a, isize size);
+BASE_DEF void   arena_pop_to(Arena *a, isize pos);
+BASE_DEF void   arena_clear(Arena *a);
+
+#define PUSH_ONE(a, T)        (T *)arena_push((a), sizeof(T), false)
+#define PUSH_ONE_NZ(a, T)     (T *)arena_push((a), sizeof(T), true)
+#define PUSH_MANY(a, T, n)    (T *)arena_push((a), sizeof(T) * (n), false)
+#define PUSH_MANY_NZ(a, T, n) (T *)arena_push((a), sizeof(T) * (n), true)
+
+struct Arena_Temp {
+    Arena *arena;
+    isize start_pos;
+};
+
+BASE_DEF Arena_Temp arena_begin_temp(Arena *a);
+BASE_DEF void       arena_end_temp(Arena_Temp temp);
+
+#define ARENA_SCRATCH_POOL 2
+#define ARENA_SCRATCH_RESERVE_SIZE (MiB(64))
+#define ARENA_SCRATCH_COMMIT_SIZE  (MiB(1))
+
+extern THREAD_LOCAL Arena *arena_scratch_pool[ARENA_SCRATCH_POOL];
+
+BASE_DEF Arena_Temp arena_begin_scratch(Arena **conflicts = NULL, i32 num_conflicts = 0);
+BASE_DEF void       arena_end_scratch(Arena_Temp scratch);
+
 // Custom allocation
 
 enum Allocation_Mode {
@@ -413,49 +454,11 @@ BASE_DEF void  allocator_free_all(Allocator a);
 BASE_DEF Allocator heap_allocator(void);
 BASE_DEF ALLOCATOR_PROC(heap_allocator_proc);
 
-#define heap_alloc(sz) allocator_alloc(heap_allocator(), sz)
-#define heap_free(ptr) allocator_free(heap_allocator(), ptr)
+#define heap_alloc(sz) allocator_alloc(heap_allocator(), (sz))
+#define heap_free(ptr) allocator_free(heap_allocator(), (ptr))
 
-// Arena
-
-#define ARENA_BASE_POS ALIGN_UP(sizeof(Arena), ARENA_ALIGN)
-#define ARENA_ALIGN (sizeof(void *))
-
-struct Arena {
-    isize reserve_size;
-    isize commit_size;
-    isize pos;
-    isize commit_pos;
-};
-
-BASE_DEF Arena *arena_create(isize reserve_size, isize commit_size);
-BASE_DEF void arena_destroy(Arena *a);
-BASE_DEF void *arena_push(Arena *a, isize size, bool non_zero = false);
-BASE_DEF void arena_pop(Arena *a, isize size);
-BASE_DEF void arena_pop_to(Arena *a, isize pos);
-BASE_DEF void arena_clear(Arena *a);
-
-#define PUSH_ONE(a, T) (T *)arena_push((a), sizeof(T), false)
-#define PUSH_ONE_NZ(a, T) (T *)arena_push((a), sizeof(T), true)
-#define PUSH_MANY(a, T, n) (T *)arena_push((a), sizeof(T) * (n), false)
-#define PUSH_MANY_NZ(a, T, n) (T *)arena_push((a), sizeof(T) * (n), true)
-
-struct Temp_Arena {
-    Arena *arena;
-    isize start_pos;
-};
-
-BASE_DEF Temp_Arena begin_temp_arena(Arena *a);
-BASE_DEF void end_temp_arena(Temp_Arena temp);
-
-#define SCRATCH_POOL 2
-#define SCRATCH_RESERVE_SIZE (MiB(64))
-#define SCRATCH_COMMIT_SIZE (MiB(1))
-
-extern THREAD_LOCAL Arena *scratch_pool[SCRATCH_POOL];
-
-BASE_DEF Temp_Arena acquire_scratch_arena(Arena **conflicts = NULL, i32 num_conflicts = 0);
-BASE_DEF void release_scratch_arena(Temp_Arena scratch);
+BASE_DEF Allocator arena_allocator(Arena *arena);
+BASE_DEF ALLOCATOR_PROC(arena_allocator_proc);
 
 // Arrays
 
@@ -831,27 +834,27 @@ BASE_DEF void arena_clear(Arena *a) {
     arena_pop_to(a, ARENA_BASE_POS);
 }
 
-BASE_DEF Temp_Arena begin_temp_arena(Arena *a) {
-    Temp_Arena temp = {};
+BASE_DEF Arena_Temp arena_begin_temp(Arena *a) {
+    Arena_Temp temp = {};
     temp.arena = a;
     temp.start_pos = a->pos;
     return temp;
 }
 
-BASE_DEF void end_temp_arena(Temp_Arena temp) {
+BASE_DEF void arena_end_temp(Arena_Temp temp) {
     arena_pop_to(temp.arena, temp.start_pos);
 }
 
-THREAD_LOCAL Arena *scratch_pool[SCRATCH_POOL] = { NULL, NULL };
+THREAD_LOCAL Arena *arena_scratch_pool[ARENA_SCRATCH_POOL] = { NULL, NULL };
 
-BASE_DEF Temp_Arena acquire_scratch_arena(Arena **conflicts, i32 num_conflicts) {
+BASE_DEF Arena_Temp arena_begin_scratch(Arena **conflicts, i32 num_conflicts) {
     isize scratch_index = -1;
 
-    for (isize i = 0; i < SCRATCH_POOL; i++) {
+    for (isize i = 0; i < ARENA_SCRATCH_POOL; i++) {
         bool found = false;
 
         for (i32 j = 0; j < num_conflicts; j++) {
-            if (scratch_pool[i] == conflicts[j]) {
+            if (arena_scratch_pool[i] == conflicts[j]) {
                 found = true;
                 break;
             }
@@ -865,25 +868,27 @@ BASE_DEF Temp_Arena acquire_scratch_arena(Arena **conflicts, i32 num_conflicts) 
 
     if (scratch_index == -1) {
         ASSERT(!"No available scratch arena");
-        Temp_Arena t = {};
+        Arena_Temp t = {};
         return t;
     }
 
-    Arena **selected = &scratch_pool[scratch_index];
+    Arena **selected = &arena_scratch_pool[scratch_index];
     if (*selected == NULL) {
-        *selected = arena_create(SCRATCH_RESERVE_SIZE, SCRATCH_COMMIT_SIZE);
+        *selected = arena_create(ARENA_SCRATCH_RESERVE_SIZE, ARENA_SCRATCH_COMMIT_SIZE);
         ASSERT(*selected);
     }
-    return begin_temp_arena(*selected);
+    return arena_begin_temp(*selected);
 }
 
-BASE_DEF void release_scratch_arena(Temp_Arena scratch) {
-    end_temp_arena(scratch);
+BASE_DEF void arena_end_scratch(Arena_Temp scratch) {
+    arena_end_temp(scratch);
 }
 
 #endif // BASE_IMPLEMENTATION
 
 // Custom allocation
+
+#ifdef BASE_IMPLEMENTATION
 
 BASE_DEF void *allocator_alloc(Allocator a, isize sz) {
     return a.proc(a.data, ALLOCATION_ALLOC, sz, DEFAULT_MEMORY_ALIGNMENT, NULL, 0);
@@ -933,6 +938,41 @@ BASE_DEF ALLOCATOR_PROC(heap_allocator_proc) {
 
     return ptr;
 }
+
+BASE_DEF Allocator arena_allocator(Arena *arena) {
+    Allocator a;
+    a.proc = arena_allocator_proc;
+    a.data = arena;
+    return a;
+}
+
+BASE_DEF ALLOCATOR_PROC(arena_allocator_proc) {
+    UNUSED(alignment);
+    UNUSED(oldmem);
+    UNUSED(oldsz);
+
+    Arena *a = (Arena *)alloc_data;
+    void *ptr = NULL;
+
+    switch (alloc_mode) {
+        case ALLOCATION_ALLOC:
+            ptr = arena_push(a, newsz);
+            break;
+        case ALLOCATION_RESIZE:
+            // nothing
+            break;
+        case ALLOCATION_FREE:
+            // nothing
+            break;
+        case ALLOCATION_FREE_ALL:
+            arena_clear(a);
+            break;
+    }
+
+    return ptr;
+}
+
+#endif // BASE_IMPLEMENTATION
 
 // Arrays
 

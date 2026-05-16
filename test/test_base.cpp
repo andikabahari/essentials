@@ -169,11 +169,11 @@ TEST(test_arena_temp_arena) {
 
     isize start = a->pos;
 
-    Temp_Arena t = begin_temp_arena(a);
+    Arena_Temp t = arena_begin_temp(a);
 
     PUSH_MANY(a, int, 200);
 
-    end_temp_arena(t);
+    arena_end_temp(t);
 
     ASSERT(a->pos == start);
 
@@ -185,14 +185,14 @@ TEST(test_arena_nested_temp) {
 
     isize start = a->pos;
 
-    Temp_Arena t1 = begin_temp_arena(a);
+    Arena_Temp t1 = arena_begin_temp(a);
     PUSH_MANY(a, int, 100);
 
-    Temp_Arena t2 = begin_temp_arena(a);
+    Arena_Temp t2 = arena_begin_temp(a);
     PUSH_MANY(a, int, 200);
 
-    end_temp_arena(t2);
-    end_temp_arena(t1);
+    arena_end_temp(t2);
+    arena_end_temp(t1);
 
     ASSERT(a->pos == start);
 
@@ -213,7 +213,7 @@ TEST(test_arena_alignment) {
 }
 
 TEST(test_scratch_basic) {
-    Temp_Arena scratch = acquire_scratch_arena(NULL, 0);
+    Arena_Temp scratch = arena_begin_scratch(NULL, 0);
 
     Arena *a = scratch.arena;
     isize start = a->pos;
@@ -221,66 +221,66 @@ TEST(test_scratch_basic) {
     int *x = PUSH_MANY(a, int, 100);
     x[0] = 123;
 
-    release_scratch_arena(scratch);
+    arena_end_scratch(scratch);
 
     ASSERT(a->pos == start);
 }
 
 TEST(test_scratch_reset) {
-    Temp_Arena s1 = acquire_scratch_arena(NULL, 0);
+    Arena_Temp s1 = arena_begin_scratch(NULL, 0);
     Arena *a = s1.arena;
 
     PUSH_MANY(a, int, 200);
 
-    release_scratch_arena(s1);
+    arena_end_scratch(s1);
 
-    Temp_Arena s2 = acquire_scratch_arena(NULL, 0);
+    Arena_Temp s2 = arena_begin_scratch(NULL, 0);
 
     ASSERT(s2.arena == a);
     ASSERT(a->pos == s2.start_pos);
 
-    release_scratch_arena(s2);
+    arena_end_scratch(s2);
 }
 
 TEST(test_scratch_conflict) {
-    Temp_Arena s1 = acquire_scratch_arena(NULL, 0);
+    Arena_Temp s1 = arena_begin_scratch(NULL, 0);
     Arena *a1 = s1.arena;
 
     Arena *conflicts[1] = { a1 };
 
-    Temp_Arena s2 = acquire_scratch_arena(conflicts, 1);
+    Arena_Temp s2 = arena_begin_scratch(conflicts, 1);
     Arena *a2 = s2.arena;
 
     ASSERT(a1 != a2); // MUST be different
 
-    release_scratch_arena(s2);
-    release_scratch_arena(s1);
+    arena_end_scratch(s2);
+    arena_end_scratch(s1);
 }
 
 TEST(test_scratch_multiple_conflicts) {
-    Temp_Arena s1 = acquire_scratch_arena(NULL, 0);
-    Temp_Arena s2 = acquire_scratch_arena(NULL, 0);
+    Arena_Temp s1 = arena_begin_scratch(NULL, 0);
+    Arena_Temp s2 = arena_begin_scratch(NULL, 0);
 
     Arena *conflicts[2] = { s1.arena, s2.arena };
 
-    Temp_Arena s3 = acquire_scratch_arena(conflicts, 2);
+    Arena_Temp s3 = arena_begin_scratch(conflicts, 2);
 
     // With SCRATCH_POOL = 2, this may fallback or reuse.
     // So we only check it's valid:
     ASSERT(s3.arena != NULL);
 
-    release_scratch_arena(s3);
-    release_scratch_arena(s2);
-    release_scratch_arena(s1);
+    arena_end_scratch(s3);
+    arena_end_scratch(s2);
+    arena_end_scratch(s1);
 }
 
 TEST(test_scratch_nested) {
-    Temp_Arena s1 = acquire_scratch_arena(NULL, 0);
+    Arena_Temp s1 = arena_begin_scratch(NULL, 0);
     Arena *a1 = s1.arena;
 
     Arena *conflicts[1] = { a1 };
 
-    Temp_Arena s2 = acquire_scratch_arena(conflicts, 1);
+    Arena_Temp s2 = arena_begin_scratch(conflicts, 1);
     Arena *a2 = s2.arena;
 
     PUSH_MANY(a1, int, 50);
@@ -288,22 +288,22 @@ TEST(test_scratch_nested) {
 
     ASSERT(a1 != a2);
 
-    release_scratch_arena(s2);
-    release_scratch_arena(s1);
+    arena_end_scratch(s2);
+    arena_end_scratch(s1);
 }
 
 TEST(test_scratch_reuse) {
-    Temp_Arena s1 = acquire_scratch_arena(NULL, 0);
+    Arena_Temp s1 = arena_begin_scratch(NULL, 0);
     Arena *a1 = s1.arena;
 
-    release_scratch_arena(s1);
+    arena_end_scratch(s1);
 
-    Temp_Arena s2 = acquire_scratch_arena(NULL, 0);
+    Arena_Temp s2 = arena_begin_scratch(NULL, 0);
     Arena *a2 = s2.arena;
 
     ASSERT(a1 == a2); // should reuse same slot
 
-    release_scratch_arena(s2);
+    arena_end_scratch(s2);
 }
 
 #if OS_WINDOWS
@@ -318,13 +318,13 @@ struct Thread_Result {
 internal unsigned __stdcall thread_fn(void *arg) {
     Thread_Result *res = (Thread_Result *)arg;
 
-    Temp_Arena scratch = acquire_scratch_arena(NULL, 0);
+    Arena_Temp scratch = arena_begin_scratch(NULL, 0);
     res->arena = scratch.arena;
 
     int *x = PUSH_MANY(scratch.arena, int, 16);
     x[0] = 123;
 
-    release_scratch_arena(scratch);
+    arena_end_scratch(scratch);
 
     return 0;
 }
@@ -351,25 +351,25 @@ TEST(test_thread_local_scratch) {
 }
 
 TEST(test_thread_local_reuse) {
-    Temp_Arena s1 = acquire_scratch_arena(NULL, 0);
+    Arena_Temp s1 = arena_begin_scratch(NULL, 0);
     Arena *a1 = s1.arena;
-    release_scratch_arena(s1);
+    arena_end_scratch(s1);
 
-    Temp_Arena s2 = acquire_scratch_arena(NULL, 0);
+    Arena_Temp s2 = arena_begin_scratch(NULL, 0);
     Arena *a2 = s2.arena;
-    release_scratch_arena(s2);
+    arena_end_scratch(s2);
 
     ASSERT(a1 == a2);
 }
 
 internal unsigned __stdcall thread_stress(void *arg) {
     for (int i = 0; i < 1000; i++) {
-        Temp_Arena s = acquire_scratch_arena(NULL, 0);
+        Arena_Temp s = arena_begin_scratch(NULL, 0);
 
         int *x = PUSH_MANY(s.arena, int, 32);
         x[0] = i;
 
-        release_scratch_arena(s);
+        arena_end_scratch(s);
     }
     return 0;
 }

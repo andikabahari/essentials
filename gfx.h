@@ -60,8 +60,8 @@ SDL_GPUGraphicsPipeline *gfx_pipeline = NULL;
 //     - Uniform buffers, e.g. "1u"
 //
 GFX_DEF SDL_GPUShader *gfx_load_shader(const String &file) {
-    auto s = acquire_scratch_arena();
-    defer(release_scratch_arena(s));
+    auto s = arena_begin_scratch();
+    defer (arena_end_scratch(s));
 
     Array<String> parts = string_split(s.arena, file, LIT("."));
     if (parts.len < 3) return NULL;
@@ -116,7 +116,7 @@ GFX_DEF SDL_GPUShader *gfx_load_shader(const String &file) {
     isize code_size;
     void *code = SDL_LoadFile(string_to_cstr(s.arena, file), (size_t *)&code_size);
     if (!code) return NULL;
-    defer(SDL_free(code));
+    defer (SDL_free(code));
 
     SDL_GPUShaderCreateInfo info = {};
     info.code_size  = code_size;
@@ -148,10 +148,10 @@ GFX_DEF bool gfx_init(SDL_Window *window) {
 
     /* Init graphics pipeline */ {
         auto vert_shader = gfx_load_shader(LIT("shader/gfx.vert.1u.spv"));
-        defer(SDL_ReleaseGPUShader(gfx_device, vert_shader));
+        defer (SDL_ReleaseGPUShader(gfx_device, vert_shader));
 
         auto frag_shader = gfx_load_shader(LIT("shader/gfx.frag.spv"));
-        defer(SDL_ReleaseGPUShader(gfx_device, frag_shader));
+        defer (SDL_ReleaseGPUShader(gfx_device, frag_shader));
 
         SDL_GPUColorTargetDescription color_desc = {};
         color_desc.format = SDL_GetGPUSwapchainTextureFormat(gfx_device, gfx_window);
@@ -185,7 +185,7 @@ GFX_DEF void gfx_draw() {
     auto command_buf = SDL_AcquireGPUCommandBuffer(gfx_device);
     SDL_GPUTexture *swapchain_tex;
     ASSERT(SDL_WaitAndAcquireGPUSwapchainTexture(command_buf, gfx_window, &swapchain_tex, NULL, NULL));
-    defer(SDL_SubmitGPUCommandBuffer(command_buf));
+    defer (SDL_SubmitGPUCommandBuffer(command_buf));
 
     if (swapchain_tex != NULL) {
         SDL_FColor clear_color = {0.0f, 0.2f, 0.4f, 1.0f};
@@ -196,7 +196,7 @@ GFX_DEF void gfx_draw() {
         color_info.texture = swapchain_tex;
 
         auto render_pass = SDL_BeginGPURenderPass(command_buf, &color_info, 1, NULL);
-        defer(SDL_EndGPURenderPass(render_pass));
+        defer (SDL_EndGPURenderPass(render_pass));
         SDL_BindGPUGraphicsPipeline(render_pass, gfx_pipeline);
         SDL_DrawGPUPrimitives(render_pass, 3, 1, 0, 0);
     }
