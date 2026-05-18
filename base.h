@@ -137,7 +137,7 @@
 
 #define local_persist static // Local persisting variable
 #define internal      static // Internal linkage
-#define global    static // Global variable
+#define global        static // Global variable
 
 // OS detection
 
@@ -240,7 +240,7 @@ typedef int64_t i64;
 typedef float  f32;
 typedef double f64;
 
-typedef size_t usize;
+typedef size_t    usize;
 typedef ptrdiff_t isize;
 
 #define U8_MAX  0xFF
@@ -335,6 +335,8 @@ STATIC_ASSERT(sizeof(u64) == 8, "u64 size incorrect");
 // Scope-based defer
 // From: https://github.com/gingerBill/gb/blob/master/gb.h
 
+#ifdef __cplusplus
+
 template <typename T> struct gbRemoveReference       { typedef T Type; };
 template <typename T> struct gbRemoveReference<T &>  { typedef T Type; };
 template <typename T> struct gbRemoveReference<T &&> { typedef T Type; };
@@ -351,6 +353,8 @@ struct gbprivDefer {
 template <typename F> gbprivDefer<F> gb__defer_func(F &&f) { return gbprivDefer<F>(gb_forward<F>(f)); }
 
 #define defer(code) auto CONCAT(defer_, __LINE__) = gb__defer_func([&]()->void{code;})
+
+#endif
 
 // Memory
 
@@ -371,6 +375,7 @@ BASE_DEF void  mem_free(void *ptr);
 #include <string.h>
 
 #define mem_copy    memcpy
+#define mem_move    memmove
 #define mem_set     memset
 #define mem_compare memcmp
 
@@ -389,12 +394,12 @@ BASE_DEF bool  vmem_release(void *ptr);
 #define ARENA_BASE_POS ALIGN_UP(sizeof(Arena), ARENA_ALIGN)
 #define ARENA_ALIGN (sizeof(void *))
 
-struct Arena {
+typedef struct {
     isize reserve_size;
     isize commit_size;
     isize pos;
     isize commit_pos;
-};
+} Arena;
 
 BASE_DEF Arena *arena_create(isize reserve_size, isize commit_size);
 BASE_DEF void   arena_destroy(Arena *a);
@@ -408,10 +413,10 @@ BASE_DEF void   arena_clear(Arena *a);
 #define PUSH_MANY(a, T, n)    (T *)arena_push((a), sizeof(T) * (n), false)
 #define PUSH_MANY_NZ(a, T, n) (T *)arena_push((a), sizeof(T) * (n), true)
 
-struct Arena_Temp {
+typedef struct {
     Arena *arena;
     isize start_pos;
-};
+} Arena_Temp;
 
 BASE_DEF Arena_Temp arena_begin_temp(Arena *a);
 BASE_DEF void       arena_end_temp(Arena_Temp temp);
@@ -441,15 +446,18 @@ enum Allocation_Mode {
 
 typedef ALLOCATOR_PROC(Allocator_Proc);
 
-struct Allocator {
+typedef struct {
     Allocator_Proc *proc;
     void *data;
-};
+} Allocator;
 
 BASE_DEF void *allocator_alloc(Allocator a, isize sz);
 BASE_DEF void *allocator_resize(Allocator a, void *ptr, isize oldsz, isize newsz);
 BASE_DEF void  allocator_free(Allocator a, void *ptr);
 BASE_DEF void  allocator_free_all(Allocator a);
+
+#define alloc_type(a, T)     (T *)allocator_alloc((a), sizeof(T))
+#define alloc_array(a, T, n) (T *)allocator_alloc((a), (n) * sizeof(T))
 
 BASE_DEF Allocator heap_allocator(void);
 BASE_DEF ALLOCATOR_PROC(heap_allocator_proc);
@@ -462,13 +470,15 @@ BASE_DEF ALLOCATOR_PROC(arena_allocator_proc);
 
 // Arrays
 
+#ifdef __cplusplus
+
 template <typename T>
 struct Array {
+    Allocator allocator;
+
     T *data;
     isize len;
     isize cap;
-
-    Arena *arena;
 
     T &operator[](isize index) {
         ASSERT(index < len);
@@ -488,13 +498,7 @@ template <typename T>
 internal bool array_can_grow_in_place(Array<T> *arr);
 
 template <typename T>
-void array_init(Array<T> *arr, isize initial_len, isize initial_cap, Arena *arena = NULL);
-
-template <typename T>
-void array_init(Array<T> *arr, isize initial_len, Arena *arena = NULL);
-
-template <typename T>
-void array_init(Array<T> *arr, Arena *arena = NULL);
+void array_init(Array<T> *arr, const Allocator &al, isize initial_len = 0, isize initial_cap = 0);
 
 template <typename T>
 void array_free(Array<T> *arr);
@@ -517,7 +521,11 @@ void array_ordered_remove(Array<T> *arr, isize index);
 template <typename T>
 void array_unordered_remove(Array<T> *arr, isize index);
 
+#endif // __cplusplus
+
 // Strings
+
+#ifdef __cplusplus
 
 struct String {
     u8 *data;
@@ -535,12 +543,15 @@ struct String {
 // Example: printf("%.*s\n", FMT(s));
 #define FMT(s) (int)(s).len, (const char *)(s).data
 
-BASE_DEF String string_make(u8 *str, isize len);
-
-BASE_DEF String string_empty();
-
-BASE_DEF String string_from_cstr(const char *cstr);
-BASE_DEF const char *string_to_cstr(Arena *arena, const String &s);
+inline bool byte_is_lower(u8 c);
+inline bool byte_is_upper(u8 c);
+inline bool byte_is_alpha(u8 c);
+inline bool byte_is_digit(u8 c);
+inline bool byte_is_alnum(u8 c);
+inline bool byte_is_space(u8 c);
+inline bool byte_in_set(u8 c, const String &strset);
+inline u8   byte_to_lower(u8 c);
+inline u8   byte_to_upper(u8 c);
 
 inline bool string_eq(const String &a, const String &b);
 inline bool string_ne(const String &a, const String &b);
@@ -548,6 +559,39 @@ inline bool string_lt(const String &a, const String &b);
 inline bool string_gt(const String &a, const String &b);
 inline bool string_le(const String &a, const String &b);
 inline bool string_ge(const String &a, const String &b);
+
+BASE_DEF String string_make(u8 *str, isize len);
+BASE_DEF String string_empty();
+BASE_DEF String string_from_cstr(const char *cstr);
+BASE_DEF const char *string_to_cstr(const Allocator &al, const String &s);
+
+// Non-allocating
+BASE_DEF i32    string_compare(const String &a, const String &b);
+BASE_DEF bool   string_contains(const String &s, const String &substr);
+BASE_DEF bool   string_contains_byte(const String &s, u8 c);
+BASE_DEF String string_cut_prefix(const String &s, const String &prefix);
+BASE_DEF String string_cut_suffix(const String &s, const String &suffix);
+BASE_DEF bool   string_has_prefix(const String &s, const String &prefix);
+BASE_DEF bool   string_has_suffix(const String &s, const String &suffix);
+BASE_DEF isize  string_index(const String &s, const String &substr);
+BASE_DEF isize  string_index_byte(const String &s, u8 c);
+BASE_DEF isize  string_last_index(const String &s, const String &substr);
+BASE_DEF isize  string_last_index_byte(const String &s, u8 c);
+BASE_DEF String string_trim(const String &s, const String &cutset);
+BASE_DEF String string_trim_left(const String &s, const String &cutset);
+BASE_DEF String string_trim_right(const String &s, const String &cutset);
+BASE_DEF String string_trim_space(const String &s);
+BASE_DEF String string_trim_prefix(const String &s, const String &prefix);
+BASE_DEF String string_trim_suffix(const String &s, const String &suffix);
+
+// Allocation-based
+BASE_DEF String string_to_lower(const Allocator &al, const String &s);
+BASE_DEF String string_to_upper(const Allocator &al, const String &s);
+BASE_DEF String string_clone(const Allocator &al, const String &s);
+BASE_DEF String string_concat(const Allocator &al, const String &a, const String &b);
+BASE_DEF String string_join(const Allocator &al, const Array<String> &elems, const String &sep);
+BASE_DEF Array<String> string_split(const Allocator &al, const String &s, const String &sep);
+BASE_DEF String string_replace(const Allocator &al, const String &s, const String &oldstr, const String &newstr);
 
 inline bool operator == (const String &a, const String &b);
 inline bool operator != (const String &a, const String &b);
@@ -566,46 +610,11 @@ template <isize N> inline bool operator >= (const String &a, const char (&b)[N])
 template <> inline bool operator == (const String &a, const char (&b)[1]);
 template <> inline bool operator != (const String &a, const char (&b)[1]);
 
-// Byte utils
-inline bool byte_is_lower(u8 c);
-inline bool byte_is_upper(u8 c);
-inline bool byte_is_alpha(u8 c);
-inline bool byte_is_digit(u8 c);
-inline bool byte_is_alnum(u8 c);
-inline bool byte_is_space(u8 c);
-inline bool byte_in_set(u8 c, const String &strset);
-inline u8 byte_to_lower(u8 c);
-inline u8 byte_to_upper(u8 c);
-
-// Non-allocating
-BASE_DEF i32 string_compare(const String &a, const String &b);
-BASE_DEF bool string_contains(const String &s, const String &substr);
-BASE_DEF bool string_contains_byte(const String &s, u8 c);
-BASE_DEF String string_cut_prefix(const String &s, const String &prefix);
-BASE_DEF String string_cut_suffix(const String &s, const String &suffix);
-BASE_DEF bool string_has_prefix(const String &s, const String &prefix);
-BASE_DEF bool string_has_suffix(const String &s, const String &suffix);
-BASE_DEF isize string_index(const String &s, const String &substr);
-BASE_DEF isize string_index_byte(const String &s, u8 c);
-BASE_DEF isize string_last_index(const String &s, const String &substr);
-BASE_DEF isize string_last_index_byte(const String &s, u8 c);
-BASE_DEF String string_trim(const String &s, const String &cutset);
-BASE_DEF String string_trim_left(const String &s, const String &cutset);
-BASE_DEF String string_trim_right(const String &s, const String &cutset);
-BASE_DEF String string_trim_space(const String &s);
-BASE_DEF String string_trim_prefix(const String &s, const String &prefix);
-BASE_DEF String string_trim_suffix(const String &s, const String &suffix);
-
-// Allocation-based
-BASE_DEF String string_to_lower(Arena *arena, const String &s);
-BASE_DEF String string_to_upper(Arena *arena, const String &s);
-BASE_DEF String string_clone(Arena *arena, const String &s);
-BASE_DEF String string_concat(Arena *arena, const String &a, const String &b);
-BASE_DEF String string_join(Arena *arena, const Array<String> &elems, const String &sep);
-BASE_DEF Array<String> string_split(Arena *arena, const String &s, const String &sep);
-BASE_DEF String string_replace(Arena *arena, const String &s, const String &oldstr, const String &newstr);
+#endif // __cplusplus
 
 // Hash tables
+
+#ifdef __cplusplus
 
 enum {
     TABLE_SLOT_EMPTY,
@@ -622,11 +631,11 @@ struct Table_Entry {
 
 template <typename K, typename V>
 struct Table {
+    Allocator allocator;
+
     Table_Entry<K, V> *entries;
     isize cap;
     isize len;
-
-    Arena *arena;
 };
 
 inline u32 table_hash(u64 x);
@@ -637,7 +646,7 @@ inline u32 table_hash(T *ptr);
 inline u32 table_hash(const String &s);
 
 template <typename K, typename V>
-void table_init(Table<K, V> *t, isize cap = 64, Arena *arena = NULL);
+void table_init(Table<K, V> *t, const Allocator &a, isize cap = 64);
 
 template <typename K, typename V>
 void table_free(Table<K, V> *t);
@@ -655,10 +664,12 @@ template <typename K, typename V>
 bool table_remove(Table<K, V> *t, K key);
 
 template <typename K, typename V>
-void table_resize(Table<K, V> *t, isize new_cap, Arena *arena);
+void table_resize(Table<K, V> *t, const Allocator &a, isize new_cap);
 
 template <typename K, typename V>
 void table_clear(Table<K, V> *t);
+
+#endif // __cplusplus
 
 //
 // IMPLEMENTATION
@@ -835,7 +846,7 @@ BASE_DEF void arena_clear(Arena *a) {
 }
 
 BASE_DEF Arena_Temp arena_begin_temp(Arena *a) {
-    Arena_Temp temp = {};
+    Arena_Temp temp;
     temp.arena = a;
     temp.start_pos = a->pos;
     return temp;
@@ -958,9 +969,9 @@ BASE_DEF ALLOCATOR_PROC(arena_allocator_proc) {
         case ALLOCATION_ALLOC:
             ptr = arena_push(a, newsz);
             break;
-        case ALLOCATION_RESIZE:
-            // nothing
-            break;
+        case ALLOCATION_RESIZE: {
+        } break;
+
         case ALLOCATION_FREE:
             // nothing
             break;
@@ -976,6 +987,9 @@ BASE_DEF ALLOCATOR_PROC(arena_allocator_proc) {
 
 // Arrays
 
+#ifdef __cplusplus
+
+// TODO: should this be removed?
 template <typename T>
 internal bool array_can_grow_in_place(Array<T> *arr) {
     if (!arr->data) return false;
@@ -994,87 +1008,60 @@ internal void array_grow(Array<T> *arr, isize cap_wanted) {
 }
 
 template <typename T>
-void array_init(Array<T> *arr, isize initial_len, isize initial_cap, Arena *arena) {
+void array_init(Array<T> *arr, const Allocator &al, isize initial_len, isize initial_cap) {
     ASSERT(initial_len >= 0 && initial_cap >= 0);
 
+    arr->allocator = al;
     arr->data = NULL;
-    arr->len = 0;
-    arr->cap = 0;
-    arr->arena = arena;
+    arr->len  = 0;
+    arr->cap  = 0;
 
     initial_cap = MAX(initial_len, initial_cap);
 
     if (initial_cap > 0) {
-        if (arr->arena != NULL) {
-            arr->data = PUSH_MANY(arena, T, initial_cap);
-        } else {
-            isize size = sizeof(T) * initial_cap;
-            arr->data = (T *)mem_alloc(size);
-            mem_set(arr->data, 0, size);
-        }
-        ASSERT(arr->data != NULL);
+        isize size = sizeof(T) * initial_cap;
+        arr->data = (T *)allocator_alloc(al, size);
+        ASSERT(arr->data);
+        mem_set(arr->data, 0, size);
+
         arr->cap = initial_cap;
         arr->len = initial_len;
     }
 }
 
 template <typename T>
-void array_init(Array<T> *arr, Arena *arena) {
-    array_init(arr, 0, 0, arena);
-}
-
-template <typename T>
-void array_init(Array<T> *arr, isize initial_len, Arena *arena) {
-    array_init(arr, initial_len, initial_len, arena);
-}
-
-template <typename T>
 void array_free(Array<T> *arr) {
-    if (arr->data && !arr->arena) {
-        mem_free(arr->data);
+    if (arr->data) {
+        if (arr->allocator.proc) allocator_free(arr->allocator, arr->data);
     }
 
     arr->data = NULL;
-    arr->len = 0;
-    arr->cap = 0;
-    arr->arena = NULL;
+    arr->len  = 0;
+    arr->cap  = 0;
 }
 
 template <typename T>
 void array_reserve(Array<T> *arr, isize new_cap) {
     if (new_cap <= arr->cap) return;
 
-    if (arr->arena) {
-        if (array_can_grow_in_place(arr)) {
-            isize extra = new_cap - arr->cap;
-            void *ptr = (void *)PUSH_MANY(arr->arena, T, extra);
-            ASSERT(ptr != NULL);
-            arr->cap = new_cap;
-        } else { // fallback: alloc + copy
-            T *new_data = PUSH_MANY(arr->arena, T, new_cap);
-            ASSERT(new_data != NULL);
+    isize old_size = arr->cap * sizeof(T);
+    isize new_size = new_cap * sizeof(T);
 
-            if (arr->data) {
-                mem_copy(new_data, arr->data, sizeof(T) * arr->len);
-            }
-
-            arr->data = new_data;
-            arr->cap = new_cap;
+    // Try to resize first and if it failed we fall back by doing alloc + move + free,
+    // because there are some cases where allocator just returns NULL when we try
+    // to resize, this kind of thing is common in arena allocator.
+    void *ptr = allocator_resize(arr->allocator, arr->data, old_size, new_size);
+    if (!ptr) {
+        if (new_cap > 0) {
+            ptr = allocator_alloc(arr->allocator, new_cap * sizeof(T));
+            ASSERT(ptr);
+            mem_move(ptr, arr->data, old_size);
         }
-    } else {
-        isize new_size = new_cap * sizeof(T);
-
-        if (arr->data) {
-            void *ptr = mem_resize(arr->data, new_size);
-            ASSERT(ptr != NULL);
-            arr->data = (T *)ptr;
-        } else {
-            arr->data = (T *)mem_alloc(new_size);
-            ASSERT(arr->data != NULL);
-        }
-
-        arr->cap = new_cap;
+        allocator_free(arr->allocator, arr->data);
     }
+
+    arr->data = (T *)ptr;
+    arr->cap  = new_cap;
 }
 
 template <typename T>
@@ -1118,55 +1105,11 @@ void array_unordered_remove(Array<T> *arr, isize index) {
     arr->len -= 1;
 }
 
+#endif // __cplusplus
+
 // Strings
 
-#ifdef BASE_IMPLEMENTATION
-
-BASE_DEF String string_make(u8 *str, isize len) {
-    ASSERT(len >= 0);
-    return String{ str, len };
-}
-
-BASE_DEF String string_empty() {
-    return string_make((u8 *)NULL, 0);
-}
-
-BASE_DEF String string_from_cstr(const char *cstr) {
-    return string_make((u8 *)cstr, (isize)strlen(cstr));
-}
-
-BASE_DEF const char *string_to_cstr(Arena *arena, const String &s) {
-    char *buf = (char *)arena_push(arena, s.len + 1);
-    mem_copy(buf, s.data, s.len);
-    buf[s.len] = 0;
-    return buf;
-}
-
-#endif // BASE_IMPLEMENTATION
-
-inline bool string_eq(const String &a, const String &b) { return a.len == b.len && mem_compare(a.data, b.data, a.len) == 0; }
-inline bool string_ne(const String &a, const String &b) { return !string_eq(a,b); }
-inline bool string_lt(const String &a, const String &b) { return string_compare(a,b) < 0; }
-inline bool string_gt(const String &a, const String &b) { return string_compare(a,b) > 0; }
-inline bool string_le(const String &a, const String &b) { return string_compare(a,b) <= 0; }
-inline bool string_ge(const String &a, const String &b) { return string_compare(a,b) >= 0; }
-
-inline bool operator == (const String &a, const String &b) { return string_eq(a,b); }
-inline bool operator != (const String &a, const String &b) { return string_ne(a,b); }
-inline bool operator <  (const String &a, const String &b) { return string_lt(a,b); }
-inline bool operator >  (const String &a, const String &b) { return string_gt(a,b); }
-inline bool operator <= (const String &a, const String &b) { return string_le(a,b); }
-inline bool operator >= (const String &a, const String &b) { return string_ge(a,b); }
-
-template <isize N> inline bool operator == (const String &a, const char (&b)[N]) { return string_eq(a, string_make((u8 *)b, N-1)); }
-template <isize N> inline bool operator != (const String &a, const char (&b)[N]) { return string_ne(a, string_make((u8 *)b, N-1)); }
-template <isize N> inline bool operator <  (const String &a, const char (&b)[N]) { return string_lt(a, string_make((u8 *)b, N-1)); }
-template <isize N> inline bool operator >  (const String &a, const char (&b)[N]) { return string_gt(a, string_make((u8 *)b, N-1)); }
-template <isize N> inline bool operator <= (const String &a, const char (&b)[N]) { return string_le(a, string_make((u8 *)b, N-1)); }
-template <isize N> inline bool operator >= (const String &a, const char (&b)[N]) { return string_ge(a, string_make((u8 *)b, N-1)); }
-
-template <> inline bool operator == (const String &a, const char (&b)[1]) { return a.len == 0; }
-template <> inline bool operator != (const String &a, const char (&b)[1]) { return a.len != 0; }
+#ifdef __cplusplus
 
 inline bool byte_is_lower(u8 c) {
     return 'a' <= c && c <= 'z';
@@ -1207,7 +1150,34 @@ inline u8 byte_to_upper(u8 c) {
     return byte_is_lower(c) ? c - 32 : c;
 }
 
+inline bool string_eq(const String &a, const String &b) { return a.len == b.len && mem_compare(a.data, b.data, a.len) == 0; }
+inline bool string_ne(const String &a, const String &b) { return !string_eq(a,b);          }
+inline bool string_lt(const String &a, const String &b) { return string_compare(a,b) <  0; }
+inline bool string_gt(const String &a, const String &b) { return string_compare(a,b) >  0; }
+inline bool string_le(const String &a, const String &b) { return string_compare(a,b) <= 0; }
+inline bool string_ge(const String &a, const String &b) { return string_compare(a,b) >= 0; }
+
 #ifdef BASE_IMPLEMENTATION
+
+BASE_DEF String string_make(u8 *str, isize len) {
+    ASSERT(len >= 0);
+    return String{ str, len };
+}
+
+BASE_DEF String string_empty() {
+    return string_make((u8 *)NULL, 0);
+}
+
+BASE_DEF String string_from_cstr(const char *cstr) {
+    return string_make((u8 *)cstr, (isize)strlen(cstr));
+}
+
+BASE_DEF const char *string_to_cstr(const Allocator &al, const String &s) {
+    char *buf = (char *)allocator_alloc(al, s.len + 1);
+    mem_copy(buf, s.data, s.len);
+    buf[s.len] = 0;
+    return buf;
+}
 
 BASE_DEF i32 string_compare(const String &a, const String &b) {
     isize n = MIN(a.len, b.len);
@@ -1330,27 +1300,27 @@ BASE_DEF String string_trim_suffix(const String &s, const String &suffix) {
     return s;
 }
 
-BASE_DEF String string_to_lower(Arena *arena, const String &s) {
-    u8 *data = PUSH_MANY(arena, u8, s.len);
+BASE_DEF String string_to_lower(const Allocator &al, const String &s) {
+    u8 *data = (u8 *)allocator_alloc(al, s.len);
     for (isize i = 0; i < s.len; i++) data[i] = byte_to_lower(s.data[i]);
     return string_make(data, s.len);
 }
 
-BASE_DEF String string_to_upper(Arena *arena, const String &s) {
-    u8 *data = PUSH_MANY(arena, u8, s.len);
+BASE_DEF String string_to_upper(const Allocator &al, const String &s) {
+    u8 *data = (u8 *)allocator_alloc(al, s.len);
     for (isize i = 0; i < s.len; i++) data[i] = byte_to_upper(s.data[i]);
     return string_make(data, s.len);
 }
 
-BASE_DEF String string_clone(Arena *arena, const String &s) {
-    u8 *data = PUSH_MANY(arena, u8, s.len);
+BASE_DEF String string_clone(const Allocator &al, const String &s) {
+    u8 *data = (u8 *)allocator_alloc(al, s.len);
     mem_copy(data, s.data, s.len);
     return string_make(data, s.len);
 }
 
-BASE_DEF String string_concat(Arena *arena, const String &a, const String &b) {
+BASE_DEF String string_concat(const Allocator &al, const String &a, const String &b) {
     isize len = a.len + b.len;
-    u8 *data = PUSH_MANY(arena, u8, len);
+    u8 *data = (u8 *)allocator_alloc(al, len);
 
     mem_copy(data, a.data, a.len);
     mem_copy(data + a.len, b.data, b.len);
@@ -1358,7 +1328,7 @@ BASE_DEF String string_concat(Arena *arena, const String &a, const String &b) {
     return string_make(data, len);
 }
 
-BASE_DEF String string_join(Arena *arena, const Array<String> &elems, const String &sep) {
+BASE_DEF String string_join(const Allocator &al, const Array<String> &elems, const String &sep) {
     if (elems.len == 0) return string_empty();
 
     // compute total length
@@ -1368,7 +1338,7 @@ BASE_DEF String string_join(Arena *arena, const Array<String> &elems, const Stri
     }
     total += sep.len * (elems.len - 1);
 
-    u8 *data = PUSH_MANY(arena, u8, total);
+    u8 *data = (u8 *)allocator_alloc(al, total);
 
     isize pos = 0;
 
@@ -1387,9 +1357,9 @@ BASE_DEF String string_join(Arena *arena, const Array<String> &elems, const Stri
     return string_make(data, total);
 }
 
-BASE_DEF Array<String> string_split(Arena *arena, const String &s, const String &sep) {
+BASE_DEF Array<String> string_split(const Allocator &al, const String &s, const String &sep) {
     Array<String> result;
-    array_init(&result, arena);
+    array_init(&result, al);
 
     if (sep.len == 0) {
         // split into bytes
@@ -1424,10 +1394,10 @@ BASE_DEF Array<String> string_split(Arena *arena, const String &s, const String 
     return result;
 }
 
-BASE_DEF String string_replace(Arena *arena,
-                           const String &s,
-                           const String &oldstr,
-                           const String &newstr) {
+BASE_DEF String string_replace(const Allocator &al,
+                               const String &s,
+                               const String &oldstr,
+                               const String &newstr) {
     if (oldstr.len == 0) return s;
 
     // count occurrences
@@ -1449,7 +1419,7 @@ BASE_DEF String string_replace(Arena *arena,
         s.len +
         count * (newstr.len - oldstr.len);
 
-    u8 *data = PUSH_MANY(arena, u8, new_len);
+    u8 *data = (u8 *)allocator_alloc(al, new_len);
 
     isize src = 0;
     isize dst = 0;
@@ -1472,7 +1442,28 @@ BASE_DEF String string_replace(Arena *arena,
 
 #endif // BASE_IMPLEMENTATION
 
+inline bool operator == (const String &a, const String &b) { return string_eq(a,b); }
+inline bool operator != (const String &a, const String &b) { return string_ne(a,b); }
+inline bool operator <  (const String &a, const String &b) { return string_lt(a,b); }
+inline bool operator >  (const String &a, const String &b) { return string_gt(a,b); }
+inline bool operator <= (const String &a, const String &b) { return string_le(a,b); }
+inline bool operator >= (const String &a, const String &b) { return string_ge(a,b); }
+
+template <isize N> inline bool operator == (const String &a, const char (&b)[N]) { return string_eq(a, string_make((u8 *)b, N-1)); }
+template <isize N> inline bool operator != (const String &a, const char (&b)[N]) { return string_ne(a, string_make((u8 *)b, N-1)); }
+template <isize N> inline bool operator <  (const String &a, const char (&b)[N]) { return string_lt(a, string_make((u8 *)b, N-1)); }
+template <isize N> inline bool operator >  (const String &a, const char (&b)[N]) { return string_gt(a, string_make((u8 *)b, N-1)); }
+template <isize N> inline bool operator <= (const String &a, const char (&b)[N]) { return string_le(a, string_make((u8 *)b, N-1)); }
+template <isize N> inline bool operator >= (const String &a, const char (&b)[N]) { return string_ge(a, string_make((u8 *)b, N-1)); }
+
+template <> inline bool operator == (const String &a, const char (&b)[1]) { return a.len == 0; }
+template <> inline bool operator != (const String &a, const char (&b)[1]) { return a.len != 0; }
+
+#endif // __cplusplus
+
 // Hash tables
+
+#ifdef __cplusplus
 
 // Murmur
 inline u32 table_hash(u64 x) {
@@ -1500,18 +1491,13 @@ inline u32 table_hash(const String &s) {
 }
 
 template <typename K, typename V>
-void table_init(Table<K, V> *t, isize cap, Arena *arena) {
-    t->cap = cap;
-    t->len = 0;
-    t->arena = arena;
+void table_init(Table<K, V> *t, const Allocator &a, isize cap) {
+    using Entry = Table_Entry<K, V>;
 
-    if (arena) {
-        t->entries = (Table_Entry<K, V> *)
-            arena_push(arena, sizeof(Table_Entry<K, V>) * cap);
-    } else {
-        t->entries = (Table_Entry<K, V> *)
-            mem_alloc(sizeof(Table_Entry<K, V>) * cap);
-    }
+    t->allocator = a;
+    t->cap       = cap;
+    t->len       = 0;
+    t->entries   = alloc_array(a, Entry, cap);
 
     for (isize i = 0; i < cap; i++) {
         t->entries[i].state = TABLE_SLOT_EMPTY;
@@ -1520,8 +1506,8 @@ void table_init(Table<K, V> *t, isize cap, Arena *arena) {
 
 template <typename K, typename V>
 void table_free(Table<K, V> *t) {
-    if (!t->arena && t->entries) {
-        mem_free(t->entries);
+    if (t->entries) {
+        if (t->allocator.proc) allocator_free(t->allocator, t->entries);
     }
 }
 
@@ -1555,7 +1541,7 @@ bool table_set(Table<K, V> *t, K key, const V &value) {
     // Reference: https://github.com/djiangtw/data-structures-in-practice-public/blob/main/manuscript/chapters/chapter07.md
     //
     if (t->len >= t->cap * 0.7) {
-        table_resize(t, t->cap * 2, t->arena);
+        table_resize(t, t->allocator, t->cap * 2);
     }
 
     isize index = table_find_slot(t, key);
@@ -1606,25 +1592,18 @@ bool table_remove(Table<K, V> *t, K key) {
 }
 
 template <typename K, typename V>
-void table_resize(Table<K, V> *t, isize new_cap, Arena *arena) {
-    Table_Entry<K, V> *old_entries = t->entries;
+void table_resize(Table<K, V> *t, const Allocator &a, isize new_cap) {
+    using Entry = Table_Entry<K, V>;
+
+    auto *old_entries = t->entries;
     isize old_cap = t->cap;
 
-    Table_Entry<K, V> *new_entries;
-    if (t->arena) {
-        new_entries = (Table_Entry<K, V> *)
-            arena_push(t->arena, sizeof(Table_Entry<K, V>) * new_cap);
-    } else {
-        new_entries = (Table_Entry<K, V> *)
-            mem_alloc(sizeof(Table_Entry<K, V>) * new_cap);
-    }
-
-    t->entries = new_entries;
-    t->cap = new_cap;
-    t->len = 0;
+    t->entries = alloc_array(a, Entry, new_cap);
+    t->cap     = new_cap;
+    t->len     = 0;
 
     for (isize i = 0; i < new_cap; i++) {
-        new_entries[i].state = TABLE_SLOT_EMPTY;
+        t->entries[i].state = TABLE_SLOT_EMPTY;
     }
 
     for (isize i = 0; i < old_cap; i++) {
@@ -1634,7 +1613,7 @@ void table_resize(Table<K, V> *t, isize new_cap, Arena *arena) {
         }
     }
 
-    if (!t->arena) mem_free(old_entries);
+    allocator_free(a, old_entries);
 }
 
 template <typename K, typename V>
@@ -1645,5 +1624,7 @@ void table_clear(Table<K, V> *t) {
 
     t->len = 0;
 }
+
+#endif // __cplusplus
 
 #endif // BASE_H

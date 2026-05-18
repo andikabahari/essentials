@@ -394,9 +394,10 @@ TEST(test_thread_stress) {
 
 TEST(test_array_add) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
     Array<int> arr;
-    array_init(&arr, arena);
+    array_init(&arr, al);
 
     array_add(&arr, 1);
     array_add(&arr, 2);
@@ -407,28 +408,32 @@ TEST(test_array_add) {
     ASSERT(arr[1] == 2);
     ASSERT(arr[2] == 3);
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_array_reserve) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
     Array<int> arr;
-    array_init(&arr, arena);
+    array_init(&arr, al);
 
     array_reserve(&arr, 100);
 
     ASSERT(arr.cap >= 100);
     ASSERT(arr.len == 0);
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_array_growth) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
     Array<int> arr;
-    array_init(&arr, 0, 2, arena);
+    array_init(&arr, al, 0, 2);
 
     array_add(&arr, 1);
     array_add(&arr, 2);
@@ -439,14 +444,16 @@ TEST(test_array_growth) {
     ASSERT(arr[1] == 2);
     ASSERT(arr[2] == 3);
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_array_pop) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
     Array<int> arr;
-    array_init(&arr, arena);
+    array_init(&arr, al);
 
     array_add(&arr, 5);
     array_add(&arr, 6);
@@ -457,14 +464,16 @@ TEST(test_array_pop) {
     ASSERT(arr.len == 1);
     ASSERT(arr[0] == 5);
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_array_clear) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
     Array<int> arr;
-    array_init(&arr, arena);
+    array_init(&arr, al);
 
     array_add(&arr, 1);
     array_add(&arr, 2);
@@ -473,14 +482,16 @@ TEST(test_array_clear) {
 
     ASSERT(arr.len == 0);
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_array_ordered_remove) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
     Array<int> arr;
-    array_init(&arr, arena);
+    array_init(&arr, al);
 
     array_add(&arr, 1);
     array_add(&arr, 2);
@@ -494,14 +505,16 @@ TEST(test_array_ordered_remove) {
     ASSERT(arr[1] == 3);
     ASSERT(arr[2] == 4);
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_array_unordered_remove) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
     Array<int> arr;
-    array_init(&arr, arena);
+    array_init(&arr, al);
 
     array_add(&arr, 1);
     array_add(&arr, 2);
@@ -523,6 +536,7 @@ TEST(test_array_unordered_remove) {
 
     ASSERT(found1 && found3 && found4);
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
@@ -579,73 +593,85 @@ TEST(test_string_trim_space) {
 
 TEST(test_string_split) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
     String s = LIT("a,b,c");
-    Array<String> parts = string_split(arena, s, LIT(","));
+    Array<String> parts = string_split(al, s, LIT(","));
 
     ASSERT(parts.len == 3);
     ASSERT(string_eq(parts[0], LIT("a")));
     ASSERT(string_eq(parts[1], LIT("b")));
     ASSERT(string_eq(parts[2], LIT("c")));
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_string_split_empty) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
     String s = LIT("a,,b");
-    Array<String> parts = string_split(arena, s, LIT(","));
+    Array<String> parts = string_split(al, s, LIT(","));
 
     ASSERT(parts.len == 3);
     ASSERT(parts[1].len == 0);
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_string_join) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
     Array<String> arr;
-    array_init(&arr, arena);
+    array_init(&arr, al);
 
     array_add(&arr, LIT("a"));
     array_add(&arr, LIT("b"));
     array_add(&arr, LIT("c"));
 
-    String s = string_join(arena, arr, LIT(","));
+    String s = string_join(al, arr, LIT(","));
 
     ASSERT(string_eq(s, LIT("a,b,c")));
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_string_concat) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
-    String s = string_concat(arena, LIT("foo"), LIT("bar"));
+    String s = string_concat(al, LIT("foo"), LIT("bar"));
 
     ASSERT(string_eq(s, LIT("foobar")));
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_string_replace) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
-    String s = string_replace(arena, LIT("aabb"), LIT("aa"), LIT("x"));
+    String s = string_replace(al, LIT("aabb"), LIT("aa"), LIT("x"));
 
     ASSERT(string_eq(s, LIT("xbb")));
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_string_case) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
-    ASSERT(string_eq(string_to_lower(arena, LIT("ABC")), LIT("abc")));
-    ASSERT(string_eq(string_to_upper(arena, LIT("abc")), LIT("ABC")));
+    ASSERT(string_eq(string_to_lower(al, LIT("ABC")), LIT("abc")));
+    ASSERT(string_eq(string_to_upper(al, LIT("abc")), LIT("ABC")));
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
@@ -717,7 +743,7 @@ TEST(test_string_ops_length) {
 
 TEST(test_table_basic) {
     Table<u64, int> t;
-    table_init(&t, 16);
+    table_init(&t, heap_allocator(), 16);
 
     table_set(&t, (u64)1, 10);
     table_set(&t, (u64)2, 20);
@@ -731,18 +757,20 @@ TEST(test_table_basic) {
 
 TEST(test_table_overwrite) {
     Table<u64, int> t;
-    table_init(&t, 16);
+    table_init(&t, heap_allocator(), 16);
 
     table_set(&t, (u64)1, 10);
     table_set(&t, (u64)1, 99);
 
     ASSERT(*table_get(&t, (u64)1) == 99);
     ASSERT(t.len == 1);
+
+    table_free(&t);
 }
 
 TEST(test_table_collision) {
     Table<u64, int> t;
-    table_init(&t, 4);
+    table_init(&t, heap_allocator(), 4);
 
     table_set(&t, (u64)1, 10);
     table_set(&t, (u64)5, 20); // likely same bucket
@@ -757,7 +785,7 @@ TEST(test_table_collision) {
 
 TEST(test_table_delete) {
     Table<u64, int> t;
-    table_init(&t, 8);
+    table_init(&t, heap_allocator(), 8);
 
     table_set(&t, (u64)1, 10);
     table_set(&t, (u64)9, 20); // collision chain
@@ -772,7 +800,7 @@ TEST(test_table_delete) {
 
 TEST(test_table_tombstone_reuse) {
     Table<u64, int> t;
-    table_init(&t, 8);
+    table_init(&t, heap_allocator(), 8);
 
     table_set(&t, (u64)1, 10);
     table_remove(&t, (u64)1);
@@ -786,7 +814,7 @@ TEST(test_table_tombstone_reuse) {
 
 TEST(test_table_grow) {
     Table<u64, int> t;
-    table_init(&t, 4);
+    table_init(&t, heap_allocator(), 4);
 
     for (u64 i = 0; i < 100; i++) {
         table_set(&t, i, (int)i);
@@ -801,9 +829,10 @@ TEST(test_table_grow) {
 
 TEST(test_table_stress) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
     Table<u64, int> t;
-    table_init(&t, 16, arena);
+    table_init(&t, al, 16);
 
     for (u64 i = 0; i < 10000; i++) {
         table_set(&t, i, (int)i);
@@ -821,12 +850,13 @@ TEST(test_table_stress) {
         ASSERT(table_get(&t, i) == NULL);
     }
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_table_basic_string) {
     Table<String, int> t;
-    table_init(&t, 16);
+    table_init(&t, heap_allocator(), 16);
 
     table_set(&t, LIT("apple"), 10);
     table_set(&t, LIT("banana"), 20);
@@ -840,7 +870,7 @@ TEST(test_table_basic_string) {
 
 TEST(test_table_overwrite_string) {
     Table<String, int> t;
-    table_init(&t, 16);
+    table_init(&t, heap_allocator(), 16);
 
     table_set(&t, LIT("key"), 1);
     table_set(&t, LIT("key"), 2);
@@ -853,7 +883,7 @@ TEST(test_table_overwrite_string) {
 
 TEST(test_table_collision_string) {
     Table<String, int> t;
-    table_init(&t, 4);
+    table_init(&t, heap_allocator(), 4);
 
     table_set(&t, LIT("a"), 1);
     table_set(&t, LIT("b"), 2);
@@ -868,7 +898,7 @@ TEST(test_table_collision_string) {
 
 TEST(test_table_delete_string) {
     Table<String, int> t;
-    table_init(&t, 8);
+    table_init(&t, heap_allocator(), 8);
 
     table_set(&t, LIT("hello"), 1);
     table_set(&t, LIT("world"), 2);
@@ -886,7 +916,7 @@ TEST(test_table_content_eq_string) {
     u8 b[] = "test";
 
     Table<String, String> t;
-    table_init(&t, 16);
+    table_init(&t, heap_allocator(), 16);
 
     table_set(&t, string_make(a, 4), LIT("hey"));
 
@@ -895,7 +925,7 @@ TEST(test_table_content_eq_string) {
     table_free(&t);
 }
 
-internal String make_num_string(Arena *arena, u64 x) {
+internal String make_num_string(const Allocator &a, u64 x) {
     char buf[32];
     isize len = 0;
 
@@ -911,85 +941,88 @@ internal String make_num_string(Arena *arena, u64 x) {
         buf[len - 1 - i] = tmp;
     }
 
-    return string_clone(arena, string_make((u8 *)buf, len));
+    return string_clone(a, string_make((u8 *)buf, len));
 }
 
 TEST(test_table_stress_string) {
     Arena *arena = make_arena();
+    Allocator al = arena_allocator(arena);
 
     Table<String, String> t;
-    table_init(&t, 16, arena);
+    table_init(&t, al, 16);
 
     const u64 N = 10000;
 
     for (u64 i = 0; i < N; i++) {
-        String key = make_num_string(arena, i);
-        String val = make_num_string(arena, i);
+        String key = make_num_string(al, i);
+        String val = make_num_string(al, i);
 
         table_set(&t, key, val);
     }
 
     for (u64 i = 0; i < N; i++) {
-        String key = make_num_string(arena, i);
+        String key = make_num_string(al, i);
         String *v = table_get(&t, key);
 
         ASSERT(v != NULL);
 
-        String expected = make_num_string(arena, i);
+        String expected = make_num_string(al, i);
         ASSERT(string_eq(*v, expected));
     }
 
     for (u64 i = 0; i < N; i += 2) {
-        String key = make_num_string(arena, i);
+        String key = make_num_string(al, i);
         ASSERT(table_remove(&t, key) == true);
     }
 
     for (u64 i = 0; i < N; i++) {
-        String key = make_num_string(arena, i);
+        String key = make_num_string(al, i);
         String *v = table_get(&t, key);
 
         if (i % 2 == 0) {
             ASSERT(v == NULL);
         } else {
             ASSERT(v != NULL);
-            String expected = make_num_string(arena, i);
+            String expected = make_num_string(al, i);
             ASSERT(string_eq(*v, expected));
         }
     }
 
     for (u64 i = 0; i < N; i += 2) {
-        String key = make_num_string(arena, i);
-        String val = make_num_string(arena, i + 1000000);
+        String key = make_num_string(al, i);
+        String val = make_num_string(al, i + 1000000);
 
         table_set(&t, key, val);
     }
 
     for (u64 i = 0; i < N; i++) {
-        String key = make_num_string(arena, i);
+        String key = make_num_string(al, i);
         String *v = table_get(&t, key);
 
         ASSERT(v != NULL);
 
         if (i % 2 == 0) {
-            String expected = make_num_string(arena, i + 1000000);
+            String expected = make_num_string(al, i + 1000000);
             ASSERT(string_eq(*v, expected));
         } else {
-            String expected = make_num_string(arena, i);
+            String expected = make_num_string(al, i);
             ASSERT(string_eq(*v, expected));
         }
     }
 
+    allocator_free_all(al);
     arena_destroy(arena);
 }
 
 TEST(test_table_clear) {
     Table<u64, int> t;
     {
-        table_init(&t, 8);
-        defer(table_clear(&t));
+        table_init(&t, heap_allocator(), 8);
 
         table_set(&t, (u64)1, 10);
         table_set(&t, (u64)2, 20);
+
+        table_clear(&t);
     }
 
     ASSERT(t.len == 0);
