@@ -60,11 +60,10 @@ SDL_GPUGraphicsPipeline *gfx_pipeline = NULL;
 //     - Uniform buffers, e.g. "1u"
 //
 GFX_DEF SDL_GPUShader *gfx_load_shader(const String &file) {
-    auto s = arena_begin_scratch(NULL, 0);
-    defer (arena_end_scratch(s));
-    auto sa = arena_allocator(s.arena);
+    auto s = scratch_begin(NULL, 0);
+    defer (scratch_end(s));
 
-    Array<String> parts = string_split(sa, file, LIT("."));
+    Array<String> parts = string_split(s.allocator, file, LIT("."));
     if (parts.len < 3) return NULL;
 
     String parsed_name      = parts[0];
@@ -73,13 +72,13 @@ GFX_DEF SDL_GPUShader *gfx_load_shader(const String &file) {
 
     SDL_GPUShaderFormat format;
     const char *entry;
-    if      (parsed_extension == "spv")  { format = SDL_GPU_SHADERFORMAT_SPIRV; entry = "main";  }
+         if (parsed_extension == "spv")  { format = SDL_GPU_SHADERFORMAT_SPIRV; entry = "main";  }
     else if (parsed_extension == "dxil") { format = SDL_GPU_SHADERFORMAT_DXIL;  entry = "main";  }
     else if (parsed_extension == "msl")  { format = SDL_GPU_SHADERFORMAT_MSL;   entry = "main0"; }
     else return NULL;
 
     SDL_GPUShaderStage stage;
-    if      (parsed_stage == "vert") stage = SDL_GPU_SHADERSTAGE_VERTEX;
+         if (parsed_stage == "vert") stage = SDL_GPU_SHADERSTAGE_VERTEX;
     else if (parsed_stage == "frag") stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     else return NULL;
 
@@ -115,7 +114,7 @@ GFX_DEF SDL_GPUShader *gfx_load_shader(const String &file) {
     }
 
     isize code_size;
-    void *code = SDL_LoadFile(string_to_cstr(sa, file), (size_t *)&code_size);
+    void *code = SDL_LoadFile(string_to_cstr(s.allocator, file), (size_t *)&code_size);
     if (!code) return NULL;
     defer (SDL_free(code));
 

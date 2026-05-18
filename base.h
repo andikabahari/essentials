@@ -427,7 +427,7 @@ BASE_DEF void       arena_end_temp(Arena_Temp temp);
 
 extern THREAD_LOCAL Arena *arena_scratch_pool[ARENA_SCRATCH_POOL];
 
-BASE_DEF Arena_Temp arena_begin_scratch(Arena **conflicts = NULL, i32 num_conflicts = 0);
+BASE_DEF Arena_Temp arena_begin_scratch(Arena **conflicts, i32 num_conflicts);
 BASE_DEF void       arena_end_scratch(Arena_Temp scratch);
 
 // Custom allocation
@@ -467,6 +467,14 @@ BASE_DEF ALLOCATOR_PROC(heap_allocator_proc);
 
 BASE_DEF Allocator arena_allocator(Arena *arena);
 BASE_DEF ALLOCATOR_PROC(arena_allocator_proc);
+
+typedef struct {
+    Allocator  allocator;
+    Arena_Temp temp;
+} Scratch;
+
+BASE_DEF Scratch scratch_begin(Arena **conflicts, i32 num_conflicts);
+BASE_DEF void    scratch_end(Scratch s);
 
 // Arrays
 
@@ -981,6 +989,19 @@ BASE_DEF ALLOCATOR_PROC(arena_allocator_proc) {
     }
 
     return ptr;
+}
+
+BASE_DEF Scratch scratch_begin(Arena **conflicts, i32 num_conflicts) {
+    auto temp = arena_begin_scratch(conflicts, num_conflicts);
+
+    Scratch s;
+    s.allocator = arena_allocator(temp.arena);
+    s.temp      = temp;
+    return s;
+}
+
+BASE_DEF void scratch_end(Scratch s) {
+    arena_end_scratch(s.temp);
 }
 
 #endif // BASE_IMPLEMENTATION
