@@ -125,6 +125,14 @@
 #ifndef BASE_H
 #define BASE_H
 
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <inttypes.h>
+#include <math.h>
+#include <string.h>
+
 //
 // DECLARATION
 //
@@ -347,10 +355,6 @@ template <typename F> gbprivDefer<F> gb__defer_func(F &&f) { return gbprivDefer<
 
 // Basic types
 
-#include <stdint.h>
-#include <stddef.h>
-#include <stdbool.h>
-
 typedef uint8_t   u8;
 typedef uint16_t  u16;
 typedef uint32_t  u32;
@@ -402,6 +406,8 @@ STATIC_ASSERT(sizeof(usize) == sizeof(isize), "usize and isize do not equal");
 
 // Memory
 
+C_LINKAGE_BEGIN
+
 #define DEFAULT_MEMORY_ALIGNMENT (2 * sizeof(void *))
 
 typedef void *Raw_Alloc_Proc (size_t sz);
@@ -413,8 +419,6 @@ BASE_DEF void mem_set_allocation_procs(Raw_Alloc_Proc *alloc_proc, Raw_Resize_Pr
 BASE_DEF void *mem_alloc(isize sz);
 BASE_DEF void *mem_resize(void *ptr, isize newsz);
 BASE_DEF void  mem_free(void *ptr);
-
-#include <string.h>
 
 #define mem_copy    memcpy
 #define mem_move    memmove
@@ -508,6 +512,8 @@ BASE_DEF ALLOCATOR_PROC(heap_allocator_proc);
 
 BASE_DEF Allocator arena_allocator(Arena *arena);
 BASE_DEF ALLOCATOR_PROC(arena_allocator_proc);
+
+C_LINKAGE_END
 
 #if LANG_CPP
 
@@ -715,6 +721,8 @@ void table_clear(Table<K, V> *t);
 #if OS_WINDOWS
 #include <windows.h>
 #endif
+
+C_LINKAGE_BEGIN
 
 // Memory
 
@@ -1003,6 +1011,8 @@ BASE_DEF ALLOCATOR_PROC(arena_allocator_proc) {
 
     return ptr;
 }
+
+C_LINKAGE_END
 
 #endif // BASE_IMPLEMENTATION
 
