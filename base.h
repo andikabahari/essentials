@@ -183,42 +183,166 @@
     #define COMPILER_GCC 0
 #endif
 
-// Compiler hints
+// Language detection
 
-#if COMPILER_MSVC
-    #define FORCE_INLINE    __forceinline
-    #define NO_INLINE       __declspec(noinline)
-    #define LIKELY(x)       (x)
-    #define UNLIKELY(x)     (x)
-#elif COMPILER_CLANG || COMPILER_GCC
-    #define FORCE_INLINE    __attribute__((always_inline)) inline
-    #define NO_INLINE       __attribute__((noinline))
-    #define LIKELY(x)       __builtin_expect(!!(x), 1)
-    #define UNLIKELY(x)     __builtin_expect(!!(x), 0)
+#if defined(__cplusplus)
+    #define LANG_C    0
+    #define C_VERSION 0
+
+    #define LANG_CPP 1
+    #if __cplusplus >= 202302L
+        #define CPP_VERSION 23
+    #elif __cplusplus >= 202002L
+        #define CPP_VERSION 20
+    #elif __cplusplus >= 201703L
+        #define CPP_VERSION 17
+    #elif __cplusplus >= 201402L
+        #define CPP_VERSION 14
+    #elif __cplusplus >= 201103L
+        #define CPP_VERSION 11
+    #else
+        #define CPP_VERSION 98
+    #endif
 #else
-    #define FORCE_INLINE    inline
-    #define NO_INLINE
-    #define LIKELY(x)       (x)
-    #define UNLIKELY(x)     (x)
+    #define LANG_CPP    0
+    #define CPP_VERSION 0
+
+    #define LANG_C 1
+    #if defined(__STDC_VERSION__)
+        #if __STDC_VERSION__ >= 202311L
+            #define C_VERSION 23
+        #elif __STDC_VERSION__ >= 201710L
+            #define C_VERSION 17
+        #elif __STDC_VERSION__ >= 201112L
+            #define C_VERSION 11
+        #elif __STDC_VERSION__ >= 199901L
+            #define C_VERSION 99
+        #else
+            #define C_VERSION 90
+        #endif
+    #else
+        #define C_VERSION 90
+    #endif
 #endif
 
-#define UNUSED(x)       ((void)(x))
-#define FALLTHROUGH     [[fallthrough]]
-#define DEPRECATED(msg) [[deprecated(msg)]]
-
-// Example: struct PACKED MyStruct { ... };
-#if COMPILER_MSVC
-    #define PACKED __pragma(pack(push, 1)) /* struct */ __pragma(pack(pop))
-#elif COMPILER_CLANG || COMPILER_GCC
-    #define PACKED __attribute__((packed))
+#if LANG_C && C_VERSION < 11
+    #pragma message("Warning: C11 or later recommended")
+#elif LANG_CPP && CPP_VERSION < 11
+    #pragma message("Warning: C++11 or later recommended")
 #endif
 
-#if COMPILER_MSVC
+// C linkage
+
+#if LANG_CPP
+    #define C_LINKAGE_BEGIN extern "C" {
+    #define C_LINKAGE_END   }
+    #define C_LINKAGE       extern "C"
+#else
+    #define C_LINKAGE_BEGIN
+    #define C_LINKAGE_END
+    #define C_LINKAGE
+#endif
+
+// Thread local
+
+#if CPP_VERSION >= 11
+    #define THREAD_LOCAL thread_local
+#elif C_VERSION >= 11
+    #define THREAD_LOCAL _Thread_local
+#elif COMPILER_MSVC
     #define THREAD_LOCAL __declspec(thread)
 #elif COMPILER_CLANG || COMPILER_GCC
     #define THREAD_LOCAL __thread
 #else
-    #error "No thread-local storage support for this compiler"
+    #error "No thread-local storage support available."
+#endif
+
+// Asserts
+
+#if COMPILER_MSVC
+    #define TRAP() __debugbreak()
+#else
+    #define TRAP() __builtin_trap()
+#endif
+
+#ifndef _DEBUG
+    #define ASSERT(x) do { if (!(x)) TRAP(); } while (0)
+#else
+    #define ASSERT(x)
+#endif
+
+#if CPP_VERSION >= 11
+    #define STATIC_ASSERT(expr, msg) static_assert(expr, msg)
+#elif C_VERSION >= 11
+    #define STATIC_ASSERT(expr, msg) _Static_assert(expr, msg)
+#else
+    #define STATIC_ASSERT(expr, msg) \
+        typedef char static_assertion_##__LINE__[(expr) ? 1 : -1]
+#endif
+
+// Bit manipulation
+
+#define BIT(n)            (1ULL << (n))
+#define BIT_SET(x, n)     ((x) |=  BIT(n))
+#define BIT_CLEAR(x, n)   ((x) &= ~BIT(n))
+#define BIT_TOGGLE(x, n)  ((x) ^=  BIT(n))
+#define BIT_CHECK(x, n)   (((x) >> (n)) & 1)
+
+#define KiB(n) ((u64)(n) << 10)
+#define MiB(n) ((u64)(n) << 20)
+#define GiB(n) ((u64)(n) << 30)
+
+// Math helpers
+
+#define ALIGN_UP(x, a) (((x) + ((a)-1)) & ~((a)-1))
+#define ALIGN_DOWN(x, a) ((x) & ~((a)-1))
+
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+#define CLAMP(x, lo, hi) (MAX((lo), MIN((x), (hi))))
+
+#define ABS(x)        ((x) < 0 ? -(x) : (x))
+#define SIGN(x)       ((x) > 0 ? 1 : ((x) < 0 ? -1 : 0))
+#define SQUARE(x)     ((x) * (x))
+#define IS_POW2(x)    ((x) != 0 && ((x) & ((x) - 1)) == 0)
+#define LERP(a, b, t) ((a) + ((b) - (a)) * (t))
+
+// Stringify / concat
+
+#define STRINGIFY_INNER(x) #x
+#define STRINGIFY(x)       STRINGIFY_INNER(x)
+
+#define CONCAT_INNER(a, b) a##b
+#define CONCAT(a, b)       CONCAT_INNER(a, b)
+
+// Misc
+
+#define UNUSED(x)      ((void)(x))
+#define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
+#define SWAP(T, a, b)  do { T _swap_tmp_ = (a); (a) = (b); (b) = _swap_tmp_; } while (0)
+
+// Scope-based defer
+// https://github.com/gingerBill/gb/blob/master/gb.h
+
+#if LANG_CPP
+
+template <typename T> struct gbRemoveReference       { typedef T Type; };
+template <typename T> struct gbRemoveReference<T &>  { typedef T Type; };
+template <typename T> struct gbRemoveReference<T &&> { typedef T Type; };
+
+template <typename T> inline T &&gb_forward(typename gbRemoveReference<T>::Type &t)  { return static_cast<T &&>(t); }
+template <typename T> inline T &&gb_forward(typename gbRemoveReference<T>::Type &&t) { return static_cast<T &&>(t); }
+template <typename T> inline T &&gb_move   (T &&t)                                   { return static_cast<typename gbRemoveReference<T>::Type &&>(t); }
+template <typename F>
+struct gbprivDefer {
+    F f;
+    gbprivDefer(F &&f) : f(gb_forward<F>(f)) {}
+    ~gbprivDefer() { f(); }
+};
+template <typename F> gbprivDefer<F> gb__defer_func(F &&f) { return gbprivDefer<F>(gb_forward<F>(f)); }
+
+#define defer(code) auto CONCAT(defer_, __LINE__) = gb__defer_func([&]()->void{code;})
+
 #endif
 
 // Basic types
@@ -227,21 +351,33 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
+typedef uint8_t   u8;
+typedef uint16_t  u16;
+typedef uint32_t  u32;
+typedef uint64_t  u64;
 
-typedef int8_t  i8;
-typedef int16_t i16;
-typedef int32_t i32;
-typedef int64_t i64;
+typedef int8_t    i8;
+typedef int16_t   i16;
+typedef int32_t   i32;
+typedef int64_t   i64;
 
-typedef float  f32;
-typedef double f64;
+typedef float     f32;
+typedef double    f64;
 
 typedef size_t    usize;
 typedef ptrdiff_t isize;
+
+STATIC_ASSERT(sizeof(i8)  == 1, "i8 size incorrect");
+STATIC_ASSERT(sizeof(i16) == 2, "i16 size incorrect");
+STATIC_ASSERT(sizeof(i32) == 4, "i32 size incorrect");
+STATIC_ASSERT(sizeof(i64) == 8, "i64 size incorrect");
+
+STATIC_ASSERT(sizeof(u8)  == 1, "u8 size incorrect");
+STATIC_ASSERT(sizeof(u16) == 2, "u16 size incorrect");
+STATIC_ASSERT(sizeof(u32) == 4, "u32 size incorrect");
+STATIC_ASSERT(sizeof(u64) == 8, "u64 size incorrect");
+
+STATIC_ASSERT(sizeof(usize) == sizeof(isize), "usize and isize do not equal");
 
 #define U8_MAX  0xFF
 #define U16_MAX 0xFFFF
@@ -264,101 +400,7 @@ typedef ptrdiff_t isize;
 #define F64_MAX     (1.7976931348623157e+308)
 #define F64_EPSILON (2.2204460492503131e-16)
 
-// Bit manipulation
-
-#define BIT(n)            (1ULL << (n))
-#define BIT_SET(x, n)     ((x) |=  BIT(n))
-#define BIT_CLEAR(x, n)   ((x) &= ~BIT(n))
-#define BIT_TOGGLE(x, n)  ((x) ^=  BIT(n))
-#define BIT_CHECK(x, n)   (((x) >> (n)) & 1)
-
-#define KiB(n) ((u64)(n) << 10)
-#define MiB(n) ((u64)(n) << 20)
-#define GiB(n) ((u64)(n) << 30)
-
-// Packs 4 chars into a u32, useful for file format magic numbers/tags.
-// Example: u32 png_tag = FOURCC('P','N','G',' ');
-#define FOURCC(a, b, c, d)\
-    ((u32)(a) | ((u32)(b) << 8) | ((u32)(c) << 16) | ((u32)(d) << 24))
-
-// Math helpers
-
-#define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
-
-#define ALIGN_UP(x, a) (((x) + ((a)-1)) & ~((a)-1))
-#define ALIGN_DOWN(x, a) ((x) & ~((a)-1))
-
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-#define MAX(a,b) ((a) > (b) ? (a) : (b))
-#define CLAMP(x, lo, hi) (MAX((lo), MIN((x), (hi))))
-
-#define ABS(x)        ((x) < 0 ? -(x) : (x))
-#define SIGN(x)       ((x) > 0 ? 1 : ((x) < 0 ? -1 : 0))
-#define SQUARE(x)     ((x) * (x))
-#define IS_POW2(x)    ((x) != 0 && ((x) & ((x) - 1)) == 0)
-#define LERP(a, b, t) ((a) + ((b) - (a)) * (t))
-
-// Asserts
-
-#if COMPILER_MSVC
-    #define DEBUG_BREAK() __debugbreak()
-#else
-    #define DEBUG_BREAK() __builtin_trap()
-#endif
-
-#ifndef _DEBUG
-    #define ASSERT(x) do { if (!(x)) DEBUG_BREAK(); } while(0)
-#else
-    #define ASSERT(x)
-#endif
-
-#define STATIC_ASSERT(cond, msg) static_assert(cond, msg)
-
-STATIC_ASSERT(sizeof(i8)  == 1, "i8 size incorrect");
-STATIC_ASSERT(sizeof(i16) == 2, "i16 size incorrect");
-STATIC_ASSERT(sizeof(i32) == 4, "i32 size incorrect");
-STATIC_ASSERT(sizeof(i64) == 8, "i64 size incorrect");
-
-STATIC_ASSERT(sizeof(u8)  == 1, "u8 size incorrect");
-STATIC_ASSERT(sizeof(u16) == 2, "u16 size incorrect");
-STATIC_ASSERT(sizeof(u32) == 4, "u32 size incorrect");
-STATIC_ASSERT(sizeof(u64) == 8, "u64 size incorrect");
-
-// Stringify / concat
-
-#define STRINGIFY_INNER(x) #x
-#define STRINGIFY(x)       STRINGIFY_INNER(x)
-
-#define CONCAT_INNER(a, b) a##b
-#define CONCAT(a, b)       CONCAT_INNER(a, b)
-
-// Scope-based defer
-// From: https://github.com/gingerBill/gb/blob/master/gb.h
-
-#ifdef __cplusplus
-
-template <typename T> struct gbRemoveReference       { typedef T Type; };
-template <typename T> struct gbRemoveReference<T &>  { typedef T Type; };
-template <typename T> struct gbRemoveReference<T &&> { typedef T Type; };
-
-template <typename T> inline T &&gb_forward(typename gbRemoveReference<T>::Type &t)  { return static_cast<T &&>(t); }
-template <typename T> inline T &&gb_forward(typename gbRemoveReference<T>::Type &&t) { return static_cast<T &&>(t); }
-template <typename T> inline T &&gb_move   (T &&t)                                   { return static_cast<typename gbRemoveReference<T>::Type &&>(t); }
-template <typename F>
-struct gbprivDefer {
-    F f;
-    gbprivDefer(F &&f) : f(gb_forward<F>(f)) {}
-    ~gbprivDefer() { f(); }
-};
-template <typename F> gbprivDefer<F> gb__defer_func(F &&f) { return gbprivDefer<F>(gb_forward<F>(f)); }
-
-#define defer(code) auto CONCAT(defer_, __LINE__) = gb__defer_func([&]()->void{code;})
-
-#endif
-
 // Memory
-
-#define SWAP(T, a, b) do { T _swap_tmp_ = (a); (a) = (b); (b) = _swap_tmp_; } while(0)
 
 #define DEFAULT_MEMORY_ALIGNMENT (2 * sizeof(void *))
 
@@ -379,10 +421,11 @@ BASE_DEF void  mem_free(void *ptr);
 #define mem_set     memset
 #define mem_compare memcmp
 
+// TODO: unused, to be removed
+#if 0
 BASE_DEF isize mem_page_size(void);
 BASE_DEF isize mem_granularity(void);
 
-#if 0 // vmem
 BASE_DEF void *vmem_reserve(isize size);
 BASE_DEF bool  vmem_commit(void *ptr, isize size);
 BASE_DEF bool  vmem_decommit(void *ptr, isize size);
@@ -392,7 +435,7 @@ BASE_DEF bool  vmem_release(void *ptr);
 // Arena
 
 #define ARENA_BASE_POS ALIGN_UP(sizeof(Arena), ARENA_ALIGN)
-#define ARENA_ALIGN (sizeof(void *))
+#define ARENA_ALIGN    (sizeof(void *))
 
 typedef struct {
     isize reserve_size;
@@ -408,10 +451,10 @@ BASE_DEF void   arena_pop(Arena *a, isize size);
 BASE_DEF void   arena_pop_to(Arena *a, isize pos);
 BASE_DEF void   arena_clear(Arena *a);
 
-#define PUSH_ONE(a, T)        (T *)arena_push((a), sizeof(T), false)
-#define PUSH_ONE_NZ(a, T)     (T *)arena_push((a), sizeof(T), true)
-#define PUSH_MANY(a, T, n)    (T *)arena_push((a), sizeof(T) * (n), false)
-#define PUSH_MANY_NZ(a, T, n) (T *)arena_push((a), sizeof(T) * (n), true)
+#define arena_push_type(a, T)        (T *)arena_push((a), sizeof(T), false)
+#define arena_push_type_nz(a, T)     (T *)arena_push((a), sizeof(T), true)
+#define arena_push_array(a, T, n)    (T *)arena_push((a), sizeof(T) * (n), false)
+#define arena_push_array_nz(a, T, n) (T *)arena_push((a), sizeof(T) * (n), true)
 
 typedef struct {
     Arena *arena;
@@ -425,19 +468,17 @@ BASE_DEF void       arena_end_temp(Arena_Temp temp);
 #define ARENA_SCRATCH_RESERVE_SIZE (MiB(64))
 #define ARENA_SCRATCH_COMMIT_SIZE  (MiB(1))
 
-extern THREAD_LOCAL Arena *arena_scratch_pool[ARENA_SCRATCH_POOL];
-
 BASE_DEF Arena_Temp arena_begin_scratch(Arena **conflicts, i32 num_conflicts);
 BASE_DEF void       arena_end_scratch(Arena_Temp scratch);
 
 // Custom allocation
 
-enum Allocation_Mode {
+typedef enum {
     ALLOCATION_ALLOC,
     ALLOCATION_RESIZE,
     ALLOCATION_FREE,
     ALLOCATION_FREE_ALL,
-};
+} Allocation_Mode;
 
 #define ALLOCATOR_PROC(name)\
     void *name(void *alloc_data, Allocation_Mode alloc_mode,\
@@ -468,17 +509,9 @@ BASE_DEF ALLOCATOR_PROC(heap_allocator_proc);
 BASE_DEF Allocator arena_allocator(Arena *arena);
 BASE_DEF ALLOCATOR_PROC(arena_allocator_proc);
 
-typedef struct {
-    Allocator  allocator;
-    Arena_Temp temp;
-} Scratch;
-
-BASE_DEF Scratch scratch_begin(Arena **conflicts, i32 num_conflicts);
-BASE_DEF void    scratch_end(Scratch s);
+#if LANG_CPP
 
 // Arrays
-
-#ifdef __cplusplus
 
 template <typename T>
 struct Array {
@@ -529,11 +562,7 @@ void array_ordered_remove(Array<T> *arr, isize index);
 template <typename T>
 void array_unordered_remove(Array<T> *arr, isize index);
 
-#endif // __cplusplus
-
 // Strings
-
-#ifdef __cplusplus
 
 struct String {
     u8 *data;
@@ -618,11 +647,7 @@ template <isize N> inline bool operator >= (const String &a, const char (&b)[N])
 template <> inline bool operator == (const String &a, const char (&b)[1]);
 template <> inline bool operator != (const String &a, const char (&b)[1]);
 
-#endif // __cplusplus
-
 // Hash tables
-
-#ifdef __cplusplus
 
 enum {
     TABLE_SLOT_EMPTY,
@@ -677,7 +702,7 @@ void table_resize(Table<K, V> *t, const Allocator &a, isize new_cap);
 template <typename K, typename V>
 void table_clear(Table<K, V> *t);
 
-#endif // __cplusplus
+#endif // LANG_CPP
 
 //
 // IMPLEMENTATION
@@ -691,11 +716,7 @@ void table_clear(Table<K, V> *t);
 #include <windows.h>
 #endif
 
-#endif // BASE_IMPLEMENTATION
-
 // Memory
-
-#ifdef BASE_IMPLEMENTATION
 
 global Raw_Alloc_Proc  *mem_alloc_proc  = malloc;
 global Raw_Resize_Proc *mem_resize_proc = realloc;
@@ -719,12 +740,10 @@ BASE_DEF void mem_free(void *ptr) {
     mem_free_proc(ptr);
 }
 
-#endif // BASE_IMPLEMENTATION
-
-#ifdef BASE_IMPLEMENTATION
-
 #if OS_WINDOWS
 
+// TODO: unused, to be removed
+#if 0
 BASE_DEF isize mem_page_size(void) {
     local_persist isize result = 0;
     if (result == 0) {
@@ -745,7 +764,6 @@ BASE_DEF isize mem_granularity(void) {
     return result;
 }
 
-#if 0 // vmem
 BASE_DEF void *vmem_reserve(isize size) {
     size = ALIGN_UP(size, mem_page_size());
     return VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
@@ -769,18 +787,15 @@ BASE_DEF bool vmem_release(void *ptr) {
     ASSERT(ptr);
     return VirtualFree(ptr, 0, MEM_RELEASE) != 0;
 }
-#endif
+#endif // 0
 
 #endif // OS_WINDOWS
 
-#endif // BASE_IMPLEMENTATION
-
 // Arena
 
-#ifdef BASE_IMPLEMENTATION
-
 BASE_DEF Arena *arena_create(isize reserve_size, isize commit_size) {
-#if 0 // vmem
+// TODO: unused, to be removed
+#if 0
     isize page_size = mem_page_size();
     isize gran      = mem_granularity();
 
@@ -806,7 +821,8 @@ BASE_DEF Arena *arena_create(isize reserve_size, isize commit_size) {
 }
 
 BASE_DEF void arena_destroy(Arena *a) {
-#if 0 // vmem
+// TODO: unused, to be removed
+#if 0
     vmem_release(a);
 #else
     mem_free(a);
@@ -823,7 +839,8 @@ BASE_DEF void *arena_push(Arena *a, isize size, bool non_zero) {
         isize new_pos_aligned = ALIGN_UP(new_pos, a->commit_size);
         isize new_commit_pos = MIN(new_pos_aligned, a->reserve_size);
 
-#if 0 // vmem
+// TODO: unused, to be removed
+#if 0
         u8 *mem = (u8 *)a + a->commit_pos;
         isize commit_size = new_commit_pos - a->commit_pos;
         ASSERT(vmem_commit(mem, commit_size));
@@ -903,11 +920,7 @@ BASE_DEF void arena_end_scratch(Arena_Temp scratch) {
     arena_end_temp(scratch);
 }
 
-#endif // BASE_IMPLEMENTATION
-
 // Custom allocation
-
-#ifdef BASE_IMPLEMENTATION
 
 BASE_DEF void *allocator_alloc(Allocator a, isize sz) {
     return a.proc(a.data, ALLOCATION_ALLOC, sz, DEFAULT_MEMORY_ALIGNMENT, NULL, 0);
@@ -991,24 +1004,11 @@ BASE_DEF ALLOCATOR_PROC(arena_allocator_proc) {
     return ptr;
 }
 
-BASE_DEF Scratch scratch_begin(Arena **conflicts, i32 num_conflicts) {
-    auto temp = arena_begin_scratch(conflicts, num_conflicts);
-
-    Scratch s;
-    s.allocator = arena_allocator(temp.arena);
-    s.temp      = temp;
-    return s;
-}
-
-BASE_DEF void scratch_end(Scratch s) {
-    arena_end_scratch(s.temp);
-}
-
 #endif // BASE_IMPLEMENTATION
 
-// Arrays
+#if LANG_CPP
 
-#ifdef __cplusplus
+// Arrays
 
 // TODO: should this be removed?
 template <typename T>
@@ -1126,11 +1126,7 @@ void array_unordered_remove(Array<T> *arr, isize index) {
     arr->len -= 1;
 }
 
-#endif // __cplusplus
-
 // Strings
-
-#ifdef __cplusplus
 
 inline bool byte_is_lower(u8 c) {
     return 'a' <= c && c <= 'z';
@@ -1480,11 +1476,7 @@ template <isize N> inline bool operator >= (const String &a, const char (&b)[N])
 template <> inline bool operator == (const String &a, const char (&b)[1]) { return a.len == 0; }
 template <> inline bool operator != (const String &a, const char (&b)[1]) { return a.len != 0; }
 
-#endif // __cplusplus
-
 // Hash tables
-
-#ifdef __cplusplus
 
 // Murmur
 inline u32 table_hash(u64 x) {
@@ -1646,6 +1638,6 @@ void table_clear(Table<K, V> *t) {
     t->len = 0;
 }
 
-#endif // __cplusplus
+#endif // LANG_CPP
 
 #endif // BASE_H

@@ -74,7 +74,7 @@ TEST(test_defer_resource) {
 TEST(test_arena_push_one) {
     Arena *a = make_arena();
 
-    int *x = PUSH_ONE(a, int);
+    int *x = arena_push_type(a, int);
     *x = 42;
 
     ASSERT(*x == 42);
@@ -85,7 +85,7 @@ TEST(test_arena_push_one) {
 TEST(test_arena_push_many) {
     Arena *a = make_arena();
 
-    int *arr = PUSH_MANY(a, int, 100);
+    int *arr = arena_push_array(a, int, 100);
 
     for (int i = 0; i < 100; i++) {
         arr[i] = i;
@@ -120,12 +120,12 @@ TEST(test_arena_zero_flag) {
 TEST(test_arena_pop) {
     Arena *a = make_arena();
 
-    int *x = PUSH_ONE(a, int);
+    int *x = arena_push_type(a, int);
     *x = 10;
 
     isize before = a->pos;
 
-    int *y = PUSH_ONE(a, int);
+    int *y = arena_push_type(a, int);
     *y = 20;
 
     arena_pop(a, sizeof(int));
@@ -138,12 +138,12 @@ TEST(test_arena_pop) {
 TEST(test_arena_pop_to) {
     Arena *a = make_arena();
 
-    int *a1 = PUSH_ONE(a, int);
-    int *a2 = PUSH_ONE(a, int);
+    int *a1 = arena_push_type(a, int);
+    int *a2 = arena_push_type(a, int);
 
     isize mark = a->pos;
 
-    int *a3 = PUSH_ONE(a, int);
+    int *a3 = arena_push_type(a, int);
 
     arena_pop_to(a, mark);
 
@@ -155,7 +155,7 @@ TEST(test_arena_pop_to) {
 TEST(test_arena_clear) {
     Arena *a = make_arena();
 
-    PUSH_MANY(a, int, 1000);
+    arena_push_array(a, int, 1000);
 
     arena_clear(a);
 
@@ -171,7 +171,7 @@ TEST(test_arena_temp_arena) {
 
     Arena_Temp t = arena_begin_temp(a);
 
-    PUSH_MANY(a, int, 200);
+    arena_push_array(a, int, 200);
 
     arena_end_temp(t);
 
@@ -186,10 +186,10 @@ TEST(test_arena_nested_temp) {
     isize start = a->pos;
 
     Arena_Temp t1 = arena_begin_temp(a);
-    PUSH_MANY(a, int, 100);
+    arena_push_array(a, int, 100);
 
     Arena_Temp t2 = arena_begin_temp(a);
-    PUSH_MANY(a, int, 200);
+    arena_push_array(a, int, 200);
 
     arena_end_temp(t2);
     arena_end_temp(t1);
@@ -218,7 +218,7 @@ TEST(test_scratch_basic) {
     Arena *a = scratch.arena;
     isize start = a->pos;
 
-    int *x = PUSH_MANY(a, int, 100);
+    int *x = arena_push_array(a, int, 100);
     x[0] = 123;
 
     arena_end_scratch(scratch);
@@ -230,7 +230,7 @@ TEST(test_scratch_reset) {
     Arena_Temp s1 = arena_begin_scratch(NULL, 0);
     Arena *a = s1.arena;
 
-    PUSH_MANY(a, int, 200);
+    arena_push_array(a, int, 200);
 
     arena_end_scratch(s1);
 
@@ -283,8 +283,8 @@ TEST(test_scratch_nested) {
     Arena_Temp s2 = arena_begin_scratch(conflicts, 1);
     Arena *a2 = s2.arena;
 
-    PUSH_MANY(a1, int, 50);
-    PUSH_MANY(a2, int, 50);
+    arena_push_array(a1, int, 50);
+    arena_push_array(a2, int, 50);
 
     ASSERT(a1 != a2);
 
@@ -321,7 +321,7 @@ internal unsigned __stdcall thread_fn(void *arg) {
     Arena_Temp scratch = arena_begin_scratch(NULL, 0);
     res->arena = scratch.arena;
 
-    int *x = PUSH_MANY(scratch.arena, int, 16);
+    int *x = arena_push_array(scratch.arena, int, 16);
     x[0] = 123;
 
     arena_end_scratch(scratch);
@@ -366,7 +366,7 @@ internal unsigned __stdcall thread_stress(void *arg) {
     for (int i = 0; i < 1000; i++) {
         Arena_Temp s = arena_begin_scratch(NULL, 0);
 
-        int *x = PUSH_MANY(s.arena, int, 32);
+        int *x = arena_push_array(s.arena, int, 32);
         x[0] = i;
 
         arena_end_scratch(s);

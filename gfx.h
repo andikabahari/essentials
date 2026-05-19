@@ -60,10 +60,10 @@ SDL_GPUGraphicsPipeline *gfx_pipeline = NULL;
 //     - Uniform buffers, e.g. "1u"
 //
 GFX_DEF SDL_GPUShader *gfx_load_shader(const String &file) {
-    auto s = scratch_begin(NULL, 0);
-    defer (scratch_end(s));
+    auto s = arena_begin_scratch(NULL, 0);
+    defer (arena_end_scratch(s));
 
-    Array<String> parts = string_split(s.allocator, file, LIT("."));
+    Array<String> parts = string_split(arena_allocator(s.arena), file, LIT("."));
     if (parts.len < 3) return NULL;
 
     String parsed_name      = parts[0];
@@ -114,7 +114,7 @@ GFX_DEF SDL_GPUShader *gfx_load_shader(const String &file) {
     }
 
     isize code_size;
-    void *code = SDL_LoadFile(string_to_cstr(s.allocator, file), (size_t *)&code_size);
+    void *code = SDL_LoadFile(string_to_cstr(arena_allocator(s.arena), file), (size_t *)&code_size);
     if (!code) return NULL;
     defer (SDL_free(code));
 
