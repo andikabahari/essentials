@@ -87,11 +87,11 @@ TEST(test_arena_push_many) {
 
     int *arr = arena_push_array(a, int, 100);
 
-    for (int i = 0; i < 100; i++) {
+    for_index(i, 100) { 
         arr[i] = i;
     }
 
-    for (int i = 0; i < 100; i++) {
+    for_index(i, 100) {
         ASSERT(arr[i] == i);
     }
 

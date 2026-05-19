@@ -329,6 +329,13 @@
 #define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
 #define SWAP(T, a, b)  do { T _swap_tmp_ = (a); (a) = (b); (b) = _swap_tmp_; } while (0)
 
+#define for_index(it, stop)                 for_range(it, 0, (stop))
+#define for_range(it, start, stop)          for_range_ex(it, (start), (stop), 1)
+#define for_range_ex(it, start, stop, step) for (isize it = (start); it < (stop); it += (step))
+#if LANG_CPP
+#define for_array(it, arr)                  for (auto *it = (arr).data; it != (arr).data + (arr).len; it++)
+#endif
+
 // Scope-based defer
 // https://github.com/gingerBill/gb/blob/master/gb.h
 
@@ -404,9 +411,9 @@ STATIC_ASSERT(sizeof(usize) == sizeof(isize), "usize and isize do not equal");
 #define F64_MAX     (1.7976931348623157e+308)
 #define F64_EPSILON (2.2204460492503131e-16)
 
-// Memory
-
 C_LINKAGE_BEGIN
+
+// Memory
 
 #define DEFAULT_MEMORY_ALIGNMENT (2 * sizeof(void *))
 
