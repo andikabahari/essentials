@@ -22,7 +22,7 @@ goto parse
 :: Compiler flags
 
 set cflags=
-if %opt_debug%==1 (set cflags=/Zi /Od /DDEBUG) else (set cflags=/O2)
+if %opt_debug%==1 (set cflags=/Zi /Od /D"BUILD_DEBUG=1") else (set cflags=/O2 /D"BUILD_DEBUG=0")
 if %opt_pch%==1 (set cflags=%cflags%)
 
 set lflgas=

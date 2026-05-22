@@ -155,7 +155,7 @@ GFX_DEF bool gfx_init(SDL_Window *window) {
 
         SDL_GPUColorTargetDescription color_desc = {};
         color_desc.format = SDL_GetGPUSwapchainTextureFormat(gfx_device, gfx_window);
-        
+
         SDL_GPUGraphicsPipelineTargetInfo target_info = {};
         target_info.color_target_descriptions = &color_desc;
         target_info.num_color_targets = 1;

@@ -28,13 +28,29 @@ internal Arena *make_arena() {
     return arena_create(MiB(16), MiB(1));
 }
 
+LOG_PROC(sdl_log_proc) {
+    SDL_LogPriority priority;
+
+    switch (level) {
+        case LOG_INFO:    priority = SDL_LOG_PRIORITY_INFO;    break;
+        case LOG_WARNING: priority = SDL_LOG_PRIORITY_WARN;    break;
+        case LOG_ERROR:   priority = SDL_LOG_PRIORITY_ERROR;   break;
+        default:          priority = SDL_LOG_PRIORITY_INVALID; break;
+    }
+
+    SDL_LogMessageV(SDL_LOG_CATEGORY_APPLICATION, priority, fmt, args);
+}
 
 #include "test_base.cpp"
 #include "test_linalg.cpp"
 #include "test_gfx.cpp"
 
 int main() {
-    mem_set_allocation_procs(SDL_malloc, SDL_realloc, SDL_free);
+    mem_set_procs(&SDL_malloc, &SDL_realloc, &SDL_free);
+    log_set_proc(&sdl_log_proc);
+    #if !BUILD_DEBUG
+        log_set_min_level(LOG_WARNING);
+    #endif
 
     //
     // base.h test cases

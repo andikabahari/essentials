@@ -1,7 +1,7 @@
 //
 // base.h
 //
-// This is a public domain C++ library.
+// This is a public domain C/C++ library.
 // No warranty implied, use at your own risk!
 //
 // This library contains things that I wish C provided by default.
@@ -23,7 +23,7 @@
 //
 //   #define BASE_IMPLEMENTATION
 //
-// in ONE C++ file before including this library.
+// in ONE C/C++ file before including this library.
 //
 // It should look like this:
 //
@@ -42,10 +42,10 @@
 //       void *ptr = arena_push(arena, n);
 //
 //     Push one sizeof(T) bytes onto the arena:
-//       void *ptr = PUSH_ONE(arena, T);
+//       void *ptr = arena_push_type(arena, T);
 //
 //     Push n sizeof(T) bytes onto the arena:
-//       void *ptr = PUSH_MANY(arena, T, n);
+//       void *ptr = arena_push_array(arena, T, n);
 //
 //     Clear the arena:
 //       arena_clear(arena);
@@ -54,15 +54,42 @@
 //       arena_destroy(arena);
 //
 //     Per-thread scratch arena for temporary allocation:
-//       Arena_Temp temp = arena_scratch_begin();
-//       PUSH_MANY(temp.arena, u8, 100);
-//       arena_scratch_end(temp);
+//       Arena_Temp temp = arena_begin_scratch(NULL, 0);
+//       arena_push_array(temp.arena, u8, 100);
+//       arena_end_scratch(temp);
+//
+//   Allocators
+//
+//     Allocator struct (heap and arena):
+//       Allocator ah = heap_allocator();
+//       Allocator aa = arena_allocator(arena);
+//
+//     Using allocator:
+//       isize sz1 = 69;
+//       isize sz2 = 420;
+//       void *ptr = allocator_alloc(ah, sz1);
+//       ptr = allocator_resize(ah, ptr, sz1, sz2);
+//       allocator_free(ah, ptr);
+//
+//       // Shortcut macros
+//       // heap_alloc(sz);
+//       // heap_resize(ptr, oldsz, newsz);
+//       // heap_free(ptr);
+//
+//   Logs
+//
+//     log_printf(LOG_INFO, "It says... %s", "hello!");
+//
+//     // Shortcut macros
+//     // log_info(fmt, ...);
+//     // log_warning(fmt, ...);
+//     // log_error(fmt, ...);
 //
 //   Arrays
 //
 //     Init an array of integers:
 //       Array<int> nums;
-//       array_init(&nums);
+//       array_init(&nums, heap_allocator());
 //
 //     Add items to the array:
 //       array_add(&nums, 1);
@@ -99,17 +126,17 @@
 //     Printf-style arguments:
 //       printf("%.*s", FMT(text));
 //
-//     Concatenate two strings (needs arena for allocation):
-//       String new_text = string_concat(arena, text, LIT("Bar"));
+//     Concatenate two strings:
+//       String new_text = string_concat(heap_allocator(), text, LIT("Bar"));
 //
-//     Convert to C string (needs arena for allocation):
-//       const char *cstr = string_to_cstr(arena, text);
+//     Convert to C string:
+//       const char *cstr = string_to_cstr(heap_allocator(), text);
 //
 //   Hash Tables
 //
 //     Init a hash table of type Table<String, int>:
 //       Table<String, int> height;
-//       table_init(&height);
+//       table_init(&height, heap_allocator());
 //
 //     Set an item to the hash table:
 //       table_set(&height, LIT("Asep"), 192);
@@ -239,6 +266,12 @@
     #pragma message("Warning: C++11 or later recommended")
 #endif
 
+// Debug option
+
+#if !defined(BUILD_DEBUG)
+    #define BUILD_DEBUG 1
+#endif
+
 // C linkage
 
 #if LANG_CPP
@@ -265,6 +298,15 @@
     #error "No thread-local storage support available."
 #endif
 
+// Printf format
+
+#if COMPILER_CLANG || COMPILER_GCC
+    #define PRINTF_FORMAT(fmt_index, first_arg)\
+        __attribute__((format(printf, fmt_index, first_arg)))
+#else
+    #define PRINTF_FORMAT(fmt_index, first_arg)
+#endif
+
 // Asserts
 
 #if COMPILER_MSVC
@@ -273,11 +315,44 @@
     #define TRAP() __builtin_trap()
 #endif
 
-#ifndef _DEBUG
-    #define ASSERT(x) do { if (!(x)) TRAP(); } while (0)
+#if BUILD_DEBUG
+    #define ASSERT(expr) ASSERT_MSG(expr, NULL)
+    #define ASSERT_MSG(expr, fmt, ...)\
+        do {\
+            if (!(expr)) {\
+                assert_proc("Assertion failed", #expr, __FILE__, (int)__LINE__, fmt, ##__VA_ARGS__);\
+                TRAP();\
+            }\
+        } while (0)
+    #define PANIC(fmt, ...)\
+        do {\
+            assert_proc("Panic", NULL, __FILE__, (int)__LINE__, fmt, ##__VA_ARGS__);\
+            TRAP();\
+        } while (0)
 #else
-    #define ASSERT(x)
+    #define ASSERT(expr)               (expr)
+    #define ASSERT_MSG(expr, fmt, ...) (expr)
+    #define PANIC(fmt, ...)
 #endif
+
+// The implementation is declared here because ASSERT() is used
+// inside Array and String declaration.
+internal inline void assert_proc(const char *prefix, const char *expr, const char *file, int line, const char *fmt, ...) {
+    fprintf(stderr, "%s(%d): %s: ", file, line, prefix);
+
+    if (expr) {
+        fprintf(stderr, "`%s` ", expr);
+    }
+
+    if (fmt) {
+        va_list va;
+        va_start(va, fmt);
+        vfprintf(stderr, fmt, va);
+        va_end(va);
+    }
+
+    fprintf(stderr, "\n");
+}
 
 #if CPP_VERSION >= 11
     #define STATIC_ASSERT(expr, msg) static_assert(expr, msg)
@@ -329,12 +404,9 @@
 #define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
 #define SWAP(T, a, b)  do { T _swap_tmp_ = (a); (a) = (b); (b) = _swap_tmp_; } while (0)
 
-#define for_index(it, stop)                 for_range(it, 0, (stop))
+#define for_count(it, stop)                 for_range(it, 0, (stop))
 #define for_range(it, start, stop)          for_range_ex(it, (start), (stop), 1)
 #define for_range_ex(it, start, stop, step) for (isize it = (start); it < (stop); it += (step))
-#if LANG_CPP
-#define for_array(it, arr)                  for (auto *it = (arr).data; it != (arr).data + (arr).len; it++)
-#endif
 
 // Scope-based defer
 // https://github.com/gingerBill/gb/blob/master/gb.h
@@ -421,7 +493,7 @@ typedef void *Raw_Alloc_Proc (size_t sz);
 typedef void *Raw_Resize_Proc(void *ptr, size_t newsz);
 typedef void  Raw_Free_Proc  (void *ptr);
 
-BASE_DEF void mem_set_allocation_procs(Raw_Alloc_Proc *alloc_proc, Raw_Resize_Proc *resize_proc, Raw_Free_Proc *free_proc);
+BASE_DEF void mem_set_procs(Raw_Alloc_Proc *alloc_proc, Raw_Resize_Proc *resize_proc, Raw_Free_Proc *free_proc);
 
 BASE_DEF void *mem_alloc(isize sz);
 BASE_DEF void *mem_resize(void *ptr, isize newsz);
@@ -475,9 +547,16 @@ typedef struct {
 BASE_DEF Arena_Temp arena_begin_temp(Arena *a);
 BASE_DEF void       arena_end_temp(Arena_Temp temp);
 
-#define ARENA_SCRATCH_POOL 2
-#define ARENA_SCRATCH_RESERVE_SIZE (MiB(64))
-#define ARENA_SCRATCH_COMMIT_SIZE  (MiB(1))
+// These are default arbitary values, you can define these as you wish.
+#ifndef ARENA_SCRATCH_POOL
+    #define ARENA_SCRATCH_POOL         2
+#endif
+#ifndef ARENA_SCRATCH_RESERVE_SIZE
+    #define ARENA_SCRATCH_RESERVE_SIZE MiB(32)
+#endif
+#ifndef ARENA_SCRATCH_COMMIT_SIZE
+    #define ARENA_SCRATCH_COMMIT_SIZE  MiB(4)
+#endif
 
 BASE_DEF Arena_Temp arena_begin_scratch(Arena **conflicts, i32 num_conflicts);
 BASE_DEF void       arena_end_scratch(Arena_Temp scratch);
@@ -514,17 +593,47 @@ BASE_DEF void  allocator_free_all(Allocator a);
 BASE_DEF Allocator heap_allocator(void);
 BASE_DEF ALLOCATOR_PROC(heap_allocator_proc);
 
-#define heap_alloc(sz) allocator_alloc(heap_allocator(), (sz))
-#define heap_free(ptr) allocator_free(heap_allocator(), (ptr))
+#define heap_alloc(sz)                 allocator_alloc(heap_allocator(), (sz))
+#define heap_resize(ptr, oldsz, newsz) allocator_resize(heap_allocator(), (ptr), (oldsz), (newsz))
+#define heap_free(ptr)                 allocator_free(heap_allocator(), (ptr))
 
 BASE_DEF Allocator arena_allocator(Arena *arena);
 BASE_DEF ALLOCATOR_PROC(arena_allocator_proc);
+
+// Logs
+
+typedef enum {
+    LOG_INFO,
+    LOG_WARNING,
+    LOG_ERROR,
+} Log_Level;
+
+#define LOG_PROC(name)\
+    void name(Log_Level level, const char *fmt, va_list args)
+
+typedef LOG_PROC(Log_Proc);
+
+BASE_DEF void      log_set_proc(Log_Proc *proc);
+BASE_DEF Log_Proc *log_get_proc(void);
+
+BASE_DEF LOG_PROC(log_default_proc);
+BASE_DEF LOG_PROC(log_empty_proc);
+
+BASE_DEF void log_set_min_level(Log_Level level);
+
+BASE_DEF void log_printf(Log_Level level, const char *fmt, ...) PRINTF_FORMAT(2, 3);
+
+#define log_info(...)    log_printf(LOG_INFO, __VA_ARGS__)
+#define log_warning(...) log_printf(LOG_WARNING, __VA_ARGS__)
+#define log_error(...)   log_printf(LOG_ERROR, __VA_ARGS__)
 
 C_LINKAGE_END
 
 #if LANG_CPP
 
 // Arrays
+
+#define for_array(it, arr) for (auto *it = (arr).data; it != (arr).data + (arr).len; it++)
 
 template <typename T>
 struct Array {
@@ -733,11 +842,11 @@ C_LINKAGE_BEGIN
 
 // Memory
 
-global Raw_Alloc_Proc  *mem_alloc_proc  = malloc;
-global Raw_Resize_Proc *mem_resize_proc = realloc;
-global Raw_Free_Proc   *mem_free_proc   = free;
+global Raw_Alloc_Proc  *mem_alloc_proc  = &malloc;
+global Raw_Resize_Proc *mem_resize_proc = &realloc;
+global Raw_Free_Proc   *mem_free_proc   = &free;
 
-BASE_DEF void mem_set_allocation_procs(Raw_Alloc_Proc *alloc_proc, Raw_Resize_Proc *resize_proc, Raw_Free_Proc *free_proc) {
+BASE_DEF void mem_set_procs(Raw_Alloc_Proc *alloc_proc, Raw_Resize_Proc *resize_proc, Raw_Free_Proc *free_proc) {
     mem_alloc_proc  = alloc_proc;
     mem_resize_proc = resize_proc;
     mem_free_proc   = free_proc;
@@ -918,8 +1027,8 @@ BASE_DEF Arena_Temp arena_begin_scratch(Arena **conflicts, i32 num_conflicts) {
     }
 
     if (scratch_index == -1) {
-        ASSERT(!"No available scratch arena");
-        Arena_Temp t = {};
+        PANIC("No available scratch arena");
+        Arena_Temp t = {0};
         return t;
     }
 
@@ -1019,6 +1128,59 @@ BASE_DEF ALLOCATOR_PROC(arena_allocator_proc) {
     return ptr;
 }
 
+// Logs
+
+global Log_Proc *log_proc = &log_default_proc;
+
+BASE_DEF void log_set_proc(Log_Proc *proc) {
+    log_proc = proc;
+}
+
+BASE_DEF Log_Proc *log_get_proc(void) {
+    return log_proc;
+}
+
+global Log_Level log_min_level = LOG_INFO;
+
+BASE_DEF void log_set_min_level(Log_Level level) {
+    log_min_level = level;
+}
+
+BASE_DEF LOG_PROC(log_default_proc) {
+    switch (level) {
+        case LOG_INFO:
+            fprintf(stderr, "[INFO] ");
+            break;
+        case LOG_WARNING:
+            fprintf(stderr, "[WARNING] ");
+            break;
+        case LOG_ERROR:
+            fprintf(stderr, "[ERROR] ");
+            break;
+        default:
+            PANIC("Invalid log level");
+            return;
+    }
+
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+}
+
+BASE_DEF LOG_PROC(log_empty_proc) {
+    UNUSED(level);
+    UNUSED(fmt);
+    UNUSED(args);
+}
+
+BASE_DEF void log_printf(Log_Level level, const char *fmt, ...) {
+    if (level < log_min_level) return;
+
+    va_list args;
+    va_start(args, fmt);
+    log_proc(level, fmt, args);
+    va_end(args);
+}
+
 C_LINKAGE_END
 
 #endif // BASE_IMPLEMENTATION
@@ -1027,7 +1189,7 @@ C_LINKAGE_END
 
 // Arrays
 
-// TODO: should this be removed?
+// TODO: unused, to be removed
 template <typename T>
 internal bool array_can_grow_in_place(Array<T> *arr) {
     if (!arr->data) return false;
