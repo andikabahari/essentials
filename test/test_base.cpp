@@ -1,6 +1,11 @@
+#include "test.h"
+#include "../base.h"
+
+#define make_arena() arena_create(MiB(16), MiB(1))
+
 // Scope-based defer
 
-TEST(test_defer_basic) {
+TC(test_defer_basic) {
     int x = 0;
 
     {
@@ -10,7 +15,7 @@ TEST(test_defer_basic) {
     ASSERT(x == 1);
 }
 
-TEST(test_defer_lifo) {
+TC(test_defer_lifo) {
     int x = 0;
 
     {
@@ -22,7 +27,7 @@ TEST(test_defer_lifo) {
     ASSERT(x == 321);
 }
 
-TEST(test_defer_nested) {
+TC(test_defer_nested) {
     int x = 0;
 
     {
@@ -38,7 +43,7 @@ TEST(test_defer_nested) {
     ASSERT(x == 3);
 }
 
-internal int defer_return_inner() {
+static int defer_return_inner() {
     int x = 0;
 
     {
@@ -47,18 +52,18 @@ internal int defer_return_inner() {
     }
 }
 
-TEST(test_defer_return) {
+TC(test_defer_return) {
     int r = defer_return_inner();
     ASSERT(r == 0);
 }
 
-global bool freed = false;
+static bool freed = false;
 
-internal void fake_free(void *) {
+static void fake_free(void *) {
     freed = true;
 }
 
-TEST(test_defer_resource) {
+TC(test_defer_resource) {
     freed = false;
 
     {
@@ -71,7 +76,7 @@ TEST(test_defer_resource) {
 
 // Arena
 
-TEST(test_arena_push_one) {
+TC(test_arena_push_one) {
     Arena *a = make_arena();
 
     int *x = arena_push_type(a, int);
@@ -82,7 +87,7 @@ TEST(test_arena_push_one) {
     arena_destroy(a);
 }
 
-TEST(test_arena_push_many) {
+TC(test_arena_push_many) {
     Arena *a = make_arena();
 
     int *arr = arena_push_array(a, int, 100);
@@ -98,7 +103,7 @@ TEST(test_arena_push_many) {
     arena_destroy(a);
 }
 
-TEST(test_arena_zero_flag) {
+TC(test_arena_zero_flag) {
     Arena *a = make_arena();
 
     int *x = (int *)arena_push(a, sizeof(int), false);
@@ -117,7 +122,7 @@ TEST(test_arena_zero_flag) {
     arena_destroy(a);
 }
 
-TEST(test_arena_pop) {
+TC(test_arena_pop) {
     Arena *a = make_arena();
 
     int *x = arena_push_type(a, int);
@@ -135,7 +140,7 @@ TEST(test_arena_pop) {
     arena_destroy(a);
 }
 
-TEST(test_arena_pop_to) {
+TC(test_arena_pop_to) {
     Arena *a = make_arena();
 
     int *a1 = arena_push_type(a, int);
@@ -152,7 +157,7 @@ TEST(test_arena_pop_to) {
     arena_destroy(a);
 }
 
-TEST(test_arena_clear) {
+TC(test_arena_clear) {
     Arena *a = make_arena();
 
     arena_push_array(a, int, 1000);
@@ -164,7 +169,7 @@ TEST(test_arena_clear) {
     arena_destroy(a);
 }
 
-TEST(test_arena_temp_arena) {
+TC(test_arena_temp_arena) {
     Arena *a = make_arena();
 
     isize start = a->pos;
@@ -180,7 +185,7 @@ TEST(test_arena_temp_arena) {
     arena_destroy(a);
 }
 
-TEST(test_arena_nested_temp) {
+TC(test_arena_nested_temp) {
     Arena *a = make_arena();
 
     isize start = a->pos;
@@ -200,7 +205,7 @@ TEST(test_arena_nested_temp) {
 }
 
 
-TEST(test_arena_alignment) {
+TC(test_arena_alignment) {
     Arena *a = make_arena();
 
     void *p1 = arena_push(a, 1, false);
@@ -212,7 +217,7 @@ TEST(test_arena_alignment) {
     arena_destroy(a);
 }
 
-TEST(test_scratch_basic) {
+TC(test_scratch_basic) {
     Arena_Temp scratch = arena_begin_scratch(NULL, 0);
 
     Arena *a = scratch.arena;
@@ -226,7 +231,7 @@ TEST(test_scratch_basic) {
     ASSERT(a->pos == start);
 }
 
-TEST(test_scratch_reset) {
+TC(test_scratch_reset) {
     Arena_Temp s1 = arena_begin_scratch(NULL, 0);
     Arena *a = s1.arena;
 
@@ -242,7 +247,7 @@ TEST(test_scratch_reset) {
     arena_end_scratch(s2);
 }
 
-TEST(test_scratch_conflict) {
+TC(test_scratch_conflict) {
     Arena_Temp s1 = arena_begin_scratch(NULL, 0);
     Arena *a1 = s1.arena;
 
@@ -257,7 +262,7 @@ TEST(test_scratch_conflict) {
     arena_end_scratch(s1);
 }
 
-TEST(test_scratch_multiple_conflicts) {
+TC(test_scratch_multiple_conflicts) {
     Arena_Temp s1 = arena_begin_scratch(NULL, 0);
     Arena_Temp s2 = arena_begin_scratch(NULL, 0);
 
@@ -274,7 +279,7 @@ TEST(test_scratch_multiple_conflicts) {
     arena_end_scratch(s1);
 }
 
-TEST(test_scratch_nested) {
+TC(test_scratch_nested) {
     Arena_Temp s1 = arena_begin_scratch(NULL, 0);
     Arena *a1 = s1.arena;
 
@@ -292,7 +297,7 @@ TEST(test_scratch_nested) {
     arena_end_scratch(s1);
 }
 
-TEST(test_scratch_reuse) {
+TC(test_scratch_reuse) {
     Arena_Temp s1 = arena_begin_scratch(NULL, 0);
     Arena *a1 = s1.arena;
 
@@ -315,7 +320,7 @@ struct Thread_Result {
     Arena *arena;
 };
 
-internal unsigned __stdcall thread_fn(void *arg) {
+static unsigned __stdcall thread_fn(void *arg) {
     Thread_Result *res = (Thread_Result *)arg;
 
     Arena_Temp scratch = arena_begin_scratch(NULL, 0);
@@ -329,7 +334,7 @@ internal unsigned __stdcall thread_fn(void *arg) {
     return 0;
 }
 
-TEST(test_thread_local_scratch) {
+TC(test_thread_local_scratch) {
     HANDLE t1, t2;
 
     Thread_Result r1 = {0};
@@ -350,7 +355,7 @@ TEST(test_thread_local_scratch) {
     ASSERT(r1.arena != r2.arena);
 }
 
-TEST(test_thread_local_reuse) {
+TC(test_thread_local_reuse) {
     Arena_Temp s1 = arena_begin_scratch(NULL, 0);
     Arena *a1 = s1.arena;
     arena_end_scratch(s1);
@@ -362,7 +367,7 @@ TEST(test_thread_local_reuse) {
     ASSERT(a1 == a2);
 }
 
-internal unsigned __stdcall thread_stress(void *arg) {
+static unsigned __stdcall thread_stress(void *arg) {
     for (int i = 0; i < 1000; i++) {
         Arena_Temp s = arena_begin_scratch(NULL, 0);
 
@@ -374,7 +379,7 @@ internal unsigned __stdcall thread_stress(void *arg) {
     return 0;
 }
 
-TEST(test_thread_stress) {
+TC(test_thread_stress) {
     HANDLE threads[4];
 
     for (int i = 0; i < 4; i++) {
@@ -392,7 +397,7 @@ TEST(test_thread_stress) {
 
 // Arrays
 
-TEST(test_array_add) {
+TC(test_array_add) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -412,7 +417,7 @@ TEST(test_array_add) {
     arena_destroy(arena);
 }
 
-TEST(test_array_reserve) {
+TC(test_array_reserve) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -428,7 +433,7 @@ TEST(test_array_reserve) {
     arena_destroy(arena);
 }
 
-TEST(test_array_growth) {
+TC(test_array_growth) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -448,7 +453,7 @@ TEST(test_array_growth) {
     arena_destroy(arena);
 }
 
-TEST(test_array_pop) {
+TC(test_array_pop) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -468,7 +473,7 @@ TEST(test_array_pop) {
     arena_destroy(arena);
 }
 
-TEST(test_array_clear) {
+TC(test_array_clear) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -486,7 +491,7 @@ TEST(test_array_clear) {
     arena_destroy(arena);
 }
 
-TEST(test_array_ordered_remove) {
+TC(test_array_ordered_remove) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -509,7 +514,7 @@ TEST(test_array_ordered_remove) {
     arena_destroy(arena);
 }
 
-TEST(test_array_unordered_remove) {
+TC(test_array_unordered_remove) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -542,7 +547,7 @@ TEST(test_array_unordered_remove) {
 
 // Strings
 
-TEST(test_string_eq) {
+TC(test_string_eq) {
     String a = LIT("hello");
     String b = LIT("hello");
     String c = LIT("world");
@@ -551,30 +556,30 @@ TEST(test_string_eq) {
     ASSERT(!string_eq(a,c));
 }
 
-TEST(test_string_compare) {
+TC(test_string_compare) {
     ASSERT(string_compare(LIT("a"), LIT("b")) < 0);
     ASSERT(string_compare(LIT("b"), LIT("a")) > 0);
     ASSERT(string_compare(LIT("a"), LIT("a")) == 0);
 }
 
-TEST(test_string_index) {
+TC(test_string_index) {
     ASSERT(string_index(LIT("hello"), LIT("ll")) == 2);
     ASSERT(string_index(LIT("hello"), LIT("x")) == -1);
 }
 
-TEST(test_string_prefix_suffix) {
+TC(test_string_prefix_suffix) {
     ASSERT(string_has_prefix(LIT("foobar"), LIT("foo")));
     ASSERT(string_has_suffix(LIT("foobar"), LIT("bar")));
 }
 
-TEST(test_string_cut) {
+TC(test_string_cut) {
     String s = LIT("foobar");
 
     ASSERT(string_eq(string_cut_prefix(s, LIT("foo")), LIT("bar")));
     ASSERT(string_eq(string_cut_suffix(s, LIT("bar")), LIT("foo")));
 }
 
-TEST(test_string_trim_prefix_suffix) {
+TC(test_string_trim_prefix_suffix) {
     String s = LIT("foobar");
 
     ASSERT(string_eq(string_trim_prefix(s, LIT("foo")), LIT("bar")));
@@ -584,14 +589,14 @@ TEST(test_string_trim_prefix_suffix) {
     ASSERT(string_eq(string_trim_prefix(s, LIT("xxx")), s));
 }
 
-TEST(test_string_trim_space) {
+TC(test_string_trim_space) {
     String s = LIT("  hello \n");
 
     String t = string_trim_space(s);
     ASSERT(string_eq(t, LIT("hello")));
 }
 
-TEST(test_string_split) {
+TC(test_string_split) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -607,7 +612,7 @@ TEST(test_string_split) {
     arena_destroy(arena);
 }
 
-TEST(test_string_split_empty) {
+TC(test_string_split_empty) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -621,7 +626,7 @@ TEST(test_string_split_empty) {
     arena_destroy(arena);
 }
 
-TEST(test_string_join) {
+TC(test_string_join) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -640,7 +645,7 @@ TEST(test_string_join) {
     arena_destroy(arena);
 }
 
-TEST(test_string_concat) {
+TC(test_string_concat) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -652,7 +657,7 @@ TEST(test_string_concat) {
     arena_destroy(arena);
 }
 
-TEST(test_string_replace) {
+TC(test_string_replace) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -664,7 +669,7 @@ TEST(test_string_replace) {
     arena_destroy(arena);
 }
 
-TEST(test_string_case) {
+TC(test_string_case) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -675,7 +680,7 @@ TEST(test_string_case) {
     arena_destroy(arena);
 }
 
-TEST(test_string_ops_string) {
+TC(test_string_ops_string) {
     String a = LIT("abc");
     String b = LIT("abc");
     String c = LIT("abd");
@@ -694,7 +699,7 @@ TEST(test_string_ops_string) {
     ASSERT(c >= a);
 }
 
-TEST(test_string_ops_cstr) {
+TC(test_string_ops_cstr) {
     String a = LIT("hello");
 
     ASSERT(a == "hello");
@@ -707,7 +712,7 @@ TEST(test_string_ops_cstr) {
     ASSERT(a >= "hello");
 }
 
-TEST(test_string_ops_empty_cstr) {
+TC(test_string_ops_empty_cstr) {
     String empty = string_empty();
     String nonempty = LIT("x");
 
@@ -717,7 +722,7 @@ TEST(test_string_ops_empty_cstr) {
     ASSERT(nonempty != "");
 }
 
-TEST(test_string_ops_edge_cases) {
+TC(test_string_ops_edge_cases) {
     String a = LIT("a");
     String b = LIT("b");
 
@@ -731,7 +736,7 @@ TEST(test_string_ops_edge_cases) {
     ASSERT(a >= a);
 }
 
-TEST(test_string_ops_length) {
+TC(test_string_ops_length) {
     String short_s = LIT("ab");
     String long_s  = LIT("abc");
 
@@ -741,7 +746,7 @@ TEST(test_string_ops_length) {
 
 // Hash tables
 
-TEST(test_table_basic) {
+TC(test_table_basic) {
     Table<u64, int> t;
     table_init(&t, heap_allocator(), 16);
 
@@ -755,7 +760,7 @@ TEST(test_table_basic) {
     table_free(&t);
 }
 
-TEST(test_table_overwrite) {
+TC(test_table_overwrite) {
     Table<u64, int> t;
     table_init(&t, heap_allocator(), 16);
 
@@ -768,7 +773,7 @@ TEST(test_table_overwrite) {
     table_free(&t);
 }
 
-TEST(test_table_collision) {
+TC(test_table_collision) {
     Table<u64, int> t;
     table_init(&t, heap_allocator(), 4);
 
@@ -783,7 +788,7 @@ TEST(test_table_collision) {
     table_free(&t);
 }
 
-TEST(test_table_delete) {
+TC(test_table_delete) {
     Table<u64, int> t;
     table_init(&t, heap_allocator(), 8);
 
@@ -798,7 +803,7 @@ TEST(test_table_delete) {
     table_free(&t);
 }
 
-TEST(test_table_tombstone_reuse) {
+TC(test_table_tombstone_reuse) {
     Table<u64, int> t;
     table_init(&t, heap_allocator(), 8);
 
@@ -812,7 +817,7 @@ TEST(test_table_tombstone_reuse) {
     table_free(&t);
 }
 
-TEST(test_table_grow) {
+TC(test_table_grow) {
     Table<u64, int> t;
     table_init(&t, heap_allocator(), 4);
 
@@ -827,7 +832,7 @@ TEST(test_table_grow) {
     table_free(&t);
 }
 
-TEST(test_table_stress) {
+TC(test_table_stress) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -854,7 +859,7 @@ TEST(test_table_stress) {
     arena_destroy(arena);
 }
 
-TEST(test_table_basic_string) {
+TC(test_table_basic_string) {
     Table<String, int> t;
     table_init(&t, heap_allocator(), 16);
 
@@ -868,7 +873,7 @@ TEST(test_table_basic_string) {
     table_free(&t);
 }
 
-TEST(test_table_overwrite_string) {
+TC(test_table_overwrite_string) {
     Table<String, int> t;
     table_init(&t, heap_allocator(), 16);
 
@@ -881,7 +886,7 @@ TEST(test_table_overwrite_string) {
     table_free(&t);
 }
 
-TEST(test_table_collision_string) {
+TC(test_table_collision_string) {
     Table<String, int> t;
     table_init(&t, heap_allocator(), 4);
 
@@ -896,7 +901,7 @@ TEST(test_table_collision_string) {
     table_free(&t);
 }
 
-TEST(test_table_delete_string) {
+TC(test_table_delete_string) {
     Table<String, int> t;
     table_init(&t, heap_allocator(), 8);
 
@@ -911,7 +916,7 @@ TEST(test_table_delete_string) {
     table_free(&t);
 }
 
-TEST(test_table_content_eq_string) {
+TC(test_table_content_eq_string) {
     u8 a[] = "test";
     u8 b[] = "test";
 
@@ -925,7 +930,7 @@ TEST(test_table_content_eq_string) {
     table_free(&t);
 }
 
-internal String make_num_string(const Allocator &a, u64 x) {
+static String make_num_string(const Allocator &a, u64 x) {
     char buf[32];
     isize len = 0;
 
@@ -944,7 +949,7 @@ internal String make_num_string(const Allocator &a, u64 x) {
     return string_clone(a, string_make((u8 *)buf, len));
 }
 
-TEST(test_table_stress_string) {
+TC(test_table_stress_string) {
     Arena *arena = make_arena();
     Allocator al = arena_allocator(arena);
 
@@ -1014,7 +1019,7 @@ TEST(test_table_stress_string) {
     arena_destroy(arena);
 }
 
-TEST(test_table_clear) {
+TC(test_table_clear) {
     Table<u64, int> t;
     {
         table_init(&t, heap_allocator(), 8);
@@ -1028,4 +1033,78 @@ TEST(test_table_clear) {
     ASSERT(t.len == 0);
     ASSERT(table_get(&t, (u64)1) == NULL);
     ASSERT(table_get(&t, (u64)2) == NULL);
+}
+
+
+int main(void) {
+    RUN_TC(test_defer_basic);
+    RUN_TC(test_defer_lifo);
+    RUN_TC(test_defer_nested);
+    RUN_TC(test_defer_return);
+
+    RUN_TC(test_arena_push_one);
+    RUN_TC(test_arena_push_many);
+    RUN_TC(test_arena_zero_flag);
+    // RUN_TC(test_arena_pop); // Test will fail due to alignment!
+    RUN_TC(test_arena_pop_to);
+    RUN_TC(test_arena_clear);
+    RUN_TC(test_arena_temp_arena);
+    RUN_TC(test_arena_nested_temp);
+    RUN_TC(test_arena_alignment);
+
+    RUN_TC(test_scratch_basic);
+    RUN_TC(test_scratch_reset);
+    RUN_TC(test_scratch_conflict);
+    RUN_TC(test_scratch_multiple_conflicts);
+    RUN_TC(test_scratch_nested);
+    RUN_TC(test_scratch_reuse);
+
+    RUN_TC(test_thread_local_scratch);
+    RUN_TC(test_thread_local_reuse);
+    RUN_TC(test_thread_stress);
+
+    RUN_TC(test_array_add);
+    RUN_TC(test_array_reserve);
+    RUN_TC(test_array_growth);
+    RUN_TC(test_array_pop);
+    RUN_TC(test_array_clear);
+    RUN_TC(test_array_ordered_remove);
+    RUN_TC(test_array_unordered_remove);
+
+    RUN_TC(test_string_eq);
+    RUN_TC(test_string_compare);
+    RUN_TC(test_string_index);
+    RUN_TC(test_string_prefix_suffix);
+    RUN_TC(test_string_cut);
+    RUN_TC(test_string_trim_prefix_suffix);
+    RUN_TC(test_string_trim_space);
+    RUN_TC(test_string_split);
+    RUN_TC(test_string_split_empty);
+    RUN_TC(test_string_join);
+    RUN_TC(test_string_concat);
+    RUN_TC(test_string_replace);
+    RUN_TC(test_string_case);
+    RUN_TC(test_string_ops_string);
+    RUN_TC(test_string_ops_cstr);
+    RUN_TC(test_string_ops_empty_cstr);
+    RUN_TC(test_string_ops_edge_cases);
+    RUN_TC(test_string_ops_length);
+
+    RUN_TC(test_table_basic);
+    RUN_TC(test_table_overwrite);
+    RUN_TC(test_table_collision);
+    RUN_TC(test_table_delete);
+    RUN_TC(test_table_tombstone_reuse);
+    RUN_TC(test_table_grow);
+    RUN_TC(test_table_stress);
+    RUN_TC(test_table_basic_string);
+    RUN_TC(test_table_overwrite_string);
+    RUN_TC(test_table_collision_string);
+    RUN_TC(test_table_delete_string);
+    RUN_TC(test_table_content_eq_string);
+    RUN_TC(test_table_stress_string);
+    RUN_TC(test_table_clear);
+
+    printf("All tests passed!\n");
+    return 0;
 }

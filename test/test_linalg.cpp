@@ -1,3 +1,7 @@
+#include "test.h"
+#include "../base.h"
+#include "../linalg.h"
+
 const float M_PI = 3.1415926f;
 
 inline bool feq(float a, float b) {
@@ -27,7 +31,7 @@ inline Vec3 vec3_transform_point(Mat4 m, Vec3 v) {
     return vec3_make(rx, ry, rz);
 }
 
-TEST(test_vec2) {
+TC(test_vec2) {
     Vec2 a = vec2_make(2, 4);
     Vec2 b = vec2_make(1, 2);
 
@@ -40,7 +44,7 @@ TEST(test_vec2) {
     ASSERT(feq(vec2_length_sq(a), 20.0f));
 }
 
-TEST(test_vec2_ops) {
+TC(test_vec2_ops) {
     Vec2 a = vec2_make(2, 4);
     Vec2 b = vec2_make(1, 2);
 
@@ -54,7 +58,7 @@ TEST(test_vec2_ops) {
     ASSERT(a / 2 == vec2_make( 1,  2));
 }
 
-TEST(test_vec2_ops_assignment) {
+TC(test_vec2_ops_assignment) {
     Vec2 a = vec2_make(2, 4);
     Vec2 b = vec2_make(1, 2);
 
@@ -83,7 +87,7 @@ TEST(test_vec2_ops_assignment) {
     ASSERT(x == vec2_make(1, 2));
 }
 
-TEST(test_vec3) {
+TC(test_vec3) {
     Vec3 a = vec3_make(1, 0, 0);
     Vec3 b = vec3_make(0, 1, 0);
 
@@ -95,7 +99,7 @@ TEST(test_vec3) {
     ASSERT(vec3_eq(vec3_norm(c), vec3_make(1, 0, 0)));
 }
 
-TEST(test_vec3_ops) {
+TC(test_vec3_ops) {
     Vec3 a = vec3_make(2, 4, 6);
     Vec3 b = vec3_make(1, 2, 3);
 
@@ -109,7 +113,7 @@ TEST(test_vec3_ops) {
     ASSERT(a / 2 == vec3_make( 1,  2,  3));
 }
 
-TEST(test_vec3_ops_assignment) {
+TC(test_vec3_ops_assignment) {
     Vec3 a = vec3_make(2, 4, 6);
     Vec3 b = vec3_make(1, 2, 3);
 
@@ -138,7 +142,7 @@ TEST(test_vec3_ops_assignment) {
     ASSERT(x == vec3_make(1, 2, 3));
 }
 
-TEST(test_vec3_cross_orthogonality) {
+TC(test_vec3_cross_orthogonality) {
     Vec3 a = vec3_make(1,2,3);
     Vec3 b = vec3_make(4,5,6);
 
@@ -148,7 +152,7 @@ TEST(test_vec3_cross_orthogonality) {
     ASSERT(feq(vec3_dot(c, b), 0.0f));
 }
 
-TEST(test_vec3_norm_idempotence) {
+TC(test_vec3_norm_idempotence) {
     Vec3 v = vec3_make(5,0,0);
 
     Vec3 n1 = vec3_norm(v);
@@ -157,7 +161,7 @@ TEST(test_vec3_norm_idempotence) {
     ASSERT(vec3_eq(n1, n2));
 }
 
-TEST(test_vec4) {
+TC(test_vec4) {
     Vec4 a = vec4_make(2, 4, 6, 8);
     Vec4 b = vec4_make(1, 2, 3, 4);
 
@@ -167,7 +171,7 @@ TEST(test_vec4) {
     ASSERT(feq(vec4_dot(a, b), 60.0f));
 }
 
-TEST(test_vec4_ops) {
+TC(test_vec4_ops) {
     Vec4 a = vec4_make(2, 4, 6, 8);
     Vec4 b = vec4_make(1, 2, 3, 4);
 
@@ -181,7 +185,7 @@ TEST(test_vec4_ops) {
     ASSERT(a / 2 == vec4_make( 1,  2,  3,  4));
 }
 
-TEST(test_vec4_ops_assignment) {
+TC(test_vec4_ops_assignment) {
     Vec4 a = vec4_make(2, 4, 6, 8);
     Vec4 b = vec4_make(1, 2, 3, 4);
 
@@ -210,7 +214,7 @@ TEST(test_vec4_ops_assignment) {
     ASSERT(x == vec4_make(1, 2, 3, 4));
 }
 
-TEST(test_mat4) {
+TC(test_mat4) {
     Mat4 I = mat4_identity();
     Mat4 T = mat4_translate(vec3_make(1,2,3));
 
@@ -226,7 +230,7 @@ TEST(test_mat4) {
     ASSERT(feq(M.m[10], 2.0f));
 }
 
-TEST(test_mat4_ops) {
+TC(test_mat4_ops) {
     Mat4 a = {{
          1,  2,  3,  4,
          5,  6,  7,  8,
@@ -309,7 +313,7 @@ TEST(test_mat4_ops) {
     }
 }
 
-TEST(test_mat4_ops_assignment) {
+TC(test_mat4_ops_assignment) {
     Mat4 a = {{
          1,  2,  3,  4,
          5,  6,  7,  8,
@@ -371,7 +375,7 @@ TEST(test_mat4_ops_assignment) {
     ASSERT(x * vec4_make(1, 1, 1, 1) == vec4_make(2, 3, 4, 1));
 }
 
-TEST(test_mat4_inverse) {
+TC(test_mat4_inverse) {
     Mat4 m = mat4_rotate(1.0f, vec3_make(1,0,0));
     Mat4 inv = mat4_inverse(m);
     Mat4 identity = mat4_mul(m, inv);
@@ -381,7 +385,7 @@ TEST(test_mat4_inverse) {
     }
 }
 
-TEST(test_mat4_inverse2) {
+TC(test_mat4_inverse2) {
     Mat4 T = mat4_translate(vec3_make(3, -2, 5));
     Mat4 R = mat4_rotate(1.2f, vec3_make(0,1,0));
     Mat4 S = mat4_scaling(vec3_make(2, 3, 4));
@@ -393,7 +397,7 @@ TEST(test_mat4_inverse2) {
     ASSERT(mat4_is_identity(should_be_I));
 }
 
-TEST(test_mat4_look_at) {
+TC(test_mat4_look_at) {
     Vec3 eye    = vec3_make(0,0,0);
     Vec3 target = vec3_make(0,0,-1);
     Vec3 up     = vec3_make(0,1,0);
@@ -406,7 +410,7 @@ TEST(test_mat4_look_at) {
     ASSERT(feq(v.z, -5.0f));
 }
 
-TEST(test_mat4_perspective_sanity) {
+TC(test_mat4_perspective_sanity) {
     Mat4 P = mat4_perspective(1.0f, 1.0f, 0.1f, 100.0f);
 
     Vec3 p = vec3_make(0,0,-1);
@@ -416,7 +420,7 @@ TEST(test_mat4_perspective_sanity) {
     ASSERT(clip.z >= -1.0f && clip.z <= 1.0f);
 }
 
-TEST(test_quat) {
+TC(test_quat) {
     Quat q = quat_identity();
     Mat4 m = quat_to_mat4(q);
     ASSERT(mat4_eq(m, mat4_identity()));
@@ -427,7 +431,7 @@ TEST(test_quat) {
     ASSERT(feq(len, 1.0f));
 }
 
-TEST(test_quat_ops) {
+TC(test_quat_ops) {
     Quat a = quat_make(1, 2, 3, 4);
     Quat b = quat_make(5, 6, 7, 8);
 
@@ -476,7 +480,7 @@ TEST(test_quat_ops) {
     }
 }
 
-TEST(test_quat_ops_assignment) {
+TC(test_quat_ops_assignment) {
     Quat a = quat_make(1, 2, 3, 4);
     Quat b = quat_make(5, 6, 7, 8);
 
@@ -511,7 +515,7 @@ TEST(test_quat_ops_assignment) {
     ASSERT(feq(r.z, 0.0f));
 }
 
-TEST(test_quat_norm_invariant) {
+TC(test_quat_norm_invariant) {
     Quat q = quat_make(1,2,3,4);
     Quat n = quat_norm(q);
 
@@ -519,7 +523,7 @@ TEST(test_quat_norm_invariant) {
     ASSERT(feq(len, 1.0f));
 }
 
-TEST(test_quat_rotation_preserves_length) {
+TC(test_quat_rotation_preserves_length) {
     Vec3 v = vec3_make(1,2,3);
     float len0 = vec3_length(v);
 
@@ -531,7 +535,7 @@ TEST(test_quat_rotation_preserves_length) {
     ASSERT(feq(len0, len1));
 }
 
-TEST(test_quat_slerp_endpoints) {
+TC(test_quat_slerp_endpoints) {
     Quat a = quat_identity();
     Quat b = quat_from_axis_angle(vec3_make(0,1,0), M_PI);
 
@@ -542,7 +546,7 @@ TEST(test_quat_slerp_endpoints) {
     ASSERT(feq(r1.x, b.x) && feq(r1.y, b.y) && feq(r1.z, b.z) && feq(r1.w, b.w));
 }
 
-TEST(test_transform) {
+TC(test_transform) {
     Transform a = transform_make(vec3_make(1,0,0),
                             quat_identity(),
                             vec3_make(1,1,1));
@@ -560,4 +564,35 @@ TEST(test_transform) {
     Mat4 expected = mat4_mul(ma, mb);
 
     ASSERT(mat4_eq(mc, expected));
+}
+
+int main(void) {
+    RUN_TC(test_vec2);
+    RUN_TC(test_vec2_ops);
+    RUN_TC(test_vec2_ops_assignment);
+    RUN_TC(test_vec3);
+    RUN_TC(test_vec3_ops);
+    RUN_TC(test_vec3_ops_assignment);
+    RUN_TC(test_vec3_cross_orthogonality);
+    RUN_TC(test_vec3_norm_idempotence);
+    RUN_TC(test_vec4);
+    RUN_TC(test_vec4_ops);
+    RUN_TC(test_vec4_ops_assignment);
+    RUN_TC(test_mat4);
+    RUN_TC(test_mat4_ops);
+    RUN_TC(test_mat4_ops_assignment);
+    RUN_TC(test_mat4_inverse);
+    RUN_TC(test_mat4_inverse2);
+    RUN_TC(test_mat4_look_at);
+    RUN_TC(test_mat4_perspective_sanity);
+    RUN_TC(test_quat);
+    RUN_TC(test_quat_ops);
+    RUN_TC(test_quat_ops_assignment);
+    RUN_TC(test_quat_norm_invariant);
+    RUN_TC(test_quat_rotation_preserves_length);
+    RUN_TC(test_quat_slerp_endpoints);
+    RUN_TC(test_transform);
+
+    printf("All tests passed!\n");
+    return 0;
 }

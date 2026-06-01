@@ -3,14 +3,17 @@
 
 /base.*
 !/base.h
+!/base.cpp
 
 /linalg.*
 !/linalg.h
+!/linalg.cpp
 
 /gfx.*
 !/gfx.h
+!/gfx.cpp
 
-/test_all.*
-!/test_all.cpp
+/test_*
+/sample_*
 
 /SDL3.dll
