@@ -452,9 +452,11 @@ STATIC_ASSERT(sizeof(usize) == sizeof(isize), "usize and isize do not equal");
 #define F32_MIN     (1.17549435e-38f)
 #define F32_MAX     (3.40282347e+38f)
 #define F32_EPSILON (1.19209290e-07f)
+#define F32_PI      (3.1415927f)
 #define F64_MIN     (2.2250738585072014e-308)
 #define F64_MAX     (1.7976931348623157e+308)
 #define F64_EPSILON (2.2204460492503131e-16)
+#define F64_PI      (3.141592653589793)
 
 C_LINKAGE_BEGIN
 
@@ -477,6 +479,10 @@ void  mem_free(void *ptr);
 #define mem_set     memset
 #define mem_compare memcmp
 #define mem_char    memchr
+
+#define mem_zero(x)       mem_set(&(x), 0, sizeof((x)))
+#define mem_zero_ptr(x)   mem_set((x), 0, sizeof(*(x)))
+#define mem_zero_array(x) mem_set((x), 0, sizeof((x)))
 
 // Arena
 
@@ -550,7 +556,7 @@ void *allocator_resize(Allocator a, void *ptr, isize oldsz, isize newsz);
 void  allocator_free(Allocator a, void *ptr);
 void  allocator_free_all(Allocator a);
 
-#define alloc_type(a, T)     (T *)allocator_alloc((a), sizeof(T))
+#define alloc_struct(a, T)   (T *)allocator_alloc((a), sizeof(T))
 #define alloc_array(a, T, n) (T *)allocator_alloc((a), (n) * sizeof(T))
 
 Allocator heap_allocator(void);

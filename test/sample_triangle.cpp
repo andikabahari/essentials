@@ -28,7 +28,7 @@ int main(void) {
     ASSERT(window);
     defer (SDL_DestroyWindow(window));
 
-    ASSERT(gfx_init(window));
+    gfx_init(heap_allocator(), window);
     defer (gfx_quit());
 
     bool keep_running = true;
@@ -40,7 +40,7 @@ int main(void) {
             }
         }
 
-        gfx_draw();
+        gfx_draw(GFX_BLACK);
     }
 
     return 0;

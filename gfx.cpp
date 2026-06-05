@@ -1,84 +1,8 @@
 #include "gfx.h"
 #include "base.h"
+#include "linalg.h"
 
 #include <SDL3/SDL.h>
-
-static bool gfx_initted = false;
-static SDL_Window *gfx_window = NULL;
-static SDL_GPUDevice *gfx_device = NULL;
-static SDL_GPUGraphicsPipeline *gfx_pipeline = NULL;
-
-#define GFX_SHADER_FORMAT (SDL_GPU_SHADERFORMAT_SPIRV)
-
-bool gfx_init(SDL_Window *window) {
-    gfx_window = window;
-    gfx_device = SDL_CreateGPUDevice(GFX_SHADER_FORMAT, true, NULL);
-
-    if (!gfx_device) {
-        gfx_initted = false;
-        return gfx_initted;
-    }
-
-    if (!SDL_ClaimWindowForGPUDevice(gfx_device, gfx_window)) {
-        gfx_initted = false;
-        return gfx_initted;
-    }
-
-    /* Init graphics pipeline */ {
-        auto vert_shader = gfx_load_shader(LIT("shader/gfx.vert.1u.spv"));
-        defer (SDL_ReleaseGPUShader(gfx_device, vert_shader));
-
-        auto frag_shader = gfx_load_shader(LIT("shader/gfx.frag.spv"));
-        defer (SDL_ReleaseGPUShader(gfx_device, frag_shader));
-
-        SDL_GPUColorTargetDescription color_desc = {};
-        color_desc.format = SDL_GetGPUSwapchainTextureFormat(gfx_device, gfx_window);
-
-        SDL_GPUGraphicsPipelineTargetInfo target_info = {};
-        target_info.color_target_descriptions = &color_desc;
-        target_info.num_color_targets = 1;
-
-        SDL_GPUGraphicsPipelineCreateInfo pipe_info = {};
-        pipe_info.vertex_shader   = vert_shader;
-        pipe_info.fragment_shader = frag_shader;
-        pipe_info.primitive_type  = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
-        pipe_info.target_info     = target_info;
-        gfx_pipeline = SDL_CreateGPUGraphicsPipeline(gfx_device, &pipe_info);
-    }
-
-    gfx_initted = true;
-    return gfx_initted;
-}
-
-void gfx_quit() {
-    if (gfx_initted) {
-        SDL_ReleaseGPUGraphicsPipeline(gfx_device, gfx_pipeline);
-        SDL_ReleaseWindowFromGPUDevice(gfx_device, gfx_window);
-        SDL_DestroyGPUDevice(gfx_device);
-    }
-    gfx_initted = false;
-}
-
-void gfx_draw() {
-    auto command_buf = SDL_AcquireGPUCommandBuffer(gfx_device);
-    SDL_GPUTexture *swapchain_tex;
-    ASSERT(SDL_WaitAndAcquireGPUSwapchainTexture(command_buf, gfx_window, &swapchain_tex, NULL, NULL));
-    defer (SDL_SubmitGPUCommandBuffer(command_buf));
-
-    if (swapchain_tex != NULL) {
-        SDL_FColor clear_color = { 0.0f, 0.2f, 0.4f, 1.0f };
-        SDL_GPUColorTargetInfo color_info = {};
-        color_info.clear_color = clear_color;
-        color_info.load_op     = SDL_GPU_LOADOP_CLEAR;
-        color_info.store_op    = SDL_GPU_STOREOP_STORE;
-        color_info.texture     = swapchain_tex;
-
-        auto render_pass = SDL_BeginGPURenderPass(command_buf, &color_info, 1, NULL);
-        defer (SDL_EndGPURenderPass(render_pass));
-        SDL_BindGPUGraphicsPipeline(render_pass, gfx_pipeline);
-        SDL_DrawGPUPrimitives(render_pass, 3, 1, 0, 0);
-    }
-}
 
 //
 // Load shader from a file with this name format: <name>.<stage>.<optionals>.<extension>
@@ -97,7 +21,7 @@ void gfx_draw() {
 //   - Storage buffers, e.g. "0b"
 //   - Uniform buffers, e.g. "1u"
 //
-SDL_GPUShader *gfx_load_shader(const String &file) {
+static SDL_GPUShader *gfx_load_shader(const String &file) {
     auto s = arena_begin_scratch(NULL, 0);
     defer (arena_end_scratch(s));
 
@@ -167,6 +91,202 @@ SDL_GPUShader *gfx_load_shader(const String &file) {
     info.num_storage_buffers  = num_storage_buf;
     info.num_uniform_buffers  = num_uniform_buf;
 
-    return SDL_CreateGPUShader(gfx_device, &info);
+    return SDL_CreateGPUShader(gfx_state->device, &info);
 }
 
+void gfx_init(const Allocator &a, SDL_Window *window) {
+    gfx_state = alloc_struct(a, Gfx_State);
+
+    mem_zero_ptr(gfx_state);
+
+    gfx_state->window = window;
+    gfx_state->device = SDL_CreateGPUDevice(GFX_SHADER_FORMAT, true, NULL);
+
+    ASSERT(SDL_ClaimWindowForGPUDevice(gfx_state->device, gfx_state->window));
+
+    auto vert_shader = gfx_load_shader(LIT("shader/gfx.vert.spv"));
+    defer (SDL_ReleaseGPUShader(gfx_state->device, vert_shader));
+
+    auto frag_shader = gfx_load_shader(LIT("shader/gfx.frag.spv"));
+    defer (SDL_ReleaseGPUShader(gfx_state->device, frag_shader));
+
+    /* Create pipeline */ {
+        const i32 NUM_VERTEX_ATTRIBUTES = 3;
+        SDL_GPUVertexAttribute vert_attributes[NUM_VERTEX_ATTRIBUTES];
+        mem_zero_array(vert_attributes);
+        vert_attributes[0].location    = 0;
+        vert_attributes[0].buffer_slot = 0;
+        vert_attributes[0].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+        vert_attributes[0].offset      = offsetof(Gfx_Vertex2D, position);
+        vert_attributes[1].location    = 1;
+        vert_attributes[1].buffer_slot = 0;
+        vert_attributes[1].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+        vert_attributes[1].offset      = offsetof(Gfx_Vertex2D, texcoord);
+        vert_attributes[2].location    = 2;
+        vert_attributes[2].buffer_slot = 0;
+        vert_attributes[2].format      = SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM;
+        vert_attributes[2].offset      = offsetof(Gfx_Vertex2D, color);
+
+        const i32 NUM_VERTEX_BUFFERS = 1;
+        SDL_GPUVertexBufferDescription vert_descriptions[NUM_VERTEX_BUFFERS];
+        mem_zero_array(vert_descriptions);
+        vert_descriptions[0].slot  = 0;
+        vert_descriptions[0].pitch = sizeof(Gfx_Vertex2D);
+        vert_descriptions[0].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+
+        const i32 NUM_TARGET_COLORS = 1;
+        SDL_GPUColorTargetDescription target_colors[NUM_TARGET_COLORS];
+        mem_zero_array(target_colors);
+        target_colors[0].format = SDL_GetGPUSwapchainTextureFormat(gfx_state->device, gfx_state->window);
+        target_colors[0].blend_state.enable_blend          = true;
+        target_colors[0].blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+        target_colors[0].blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+        target_colors[0].blend_state.color_blend_op        = SDL_GPU_BLENDOP_ADD;
+        target_colors[0].blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+        target_colors[0].blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+        target_colors[0].blend_state.alpha_blend_op        = SDL_GPU_BLENDOP_ADD;
+
+        SDL_GPUGraphicsPipelineCreateInfo pipe_info = {};
+        pipe_info.vertex_shader                                 = vert_shader;
+        pipe_info.fragment_shader                               = frag_shader;
+        pipe_info.vertex_input_state.vertex_attributes          = vert_attributes;
+        pipe_info.vertex_input_state.num_vertex_attributes      = NUM_VERTEX_ATTRIBUTES;
+        pipe_info.vertex_input_state.vertex_buffer_descriptions = vert_descriptions;
+        pipe_info.vertex_input_state.num_vertex_buffers         = NUM_VERTEX_BUFFERS;
+        pipe_info.primitive_type                                = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+        pipe_info.rasterizer_state.fill_mode                    = SDL_GPU_FILLMODE_FILL;
+        pipe_info.rasterizer_state.cull_mode                    = SDL_GPU_CULLMODE_NONE;
+        pipe_info.depth_stencil_state.enable_depth_test         = false;
+        pipe_info.depth_stencil_state.enable_depth_write        = false;
+        pipe_info.target_info.color_target_descriptions         = target_colors;
+        pipe_info.target_info.num_color_targets                 = NUM_TARGET_COLORS;
+
+        gfx_state->_2d.pipeline = SDL_CreateGPUGraphicsPipeline(gfx_state->device, &pipe_info);
+    }
+
+    /* Create buffers */ {
+        const Gfx_Vertex2D vertices[] = {
+            { vec2_make(-0.5f, -0.5f), vec2_make(0.0f, 1.0f), GFX_WHITE }, // Bottom-left
+            { vec2_make( 0.5f, -0.5f), vec2_make(1.0f, 1.0f), GFX_WHITE }, // Bottom-right
+            { vec2_make( 0.5f,  0.5f), vec2_make(1.0f, 0.0f), GFX_WHITE }, // Top-right
+            { vec2_make(-0.5f,  0.5f), vec2_make(0.0f, 0.0f), GFX_WHITE }, // Top-left
+        };
+
+        const u16 indices[] = {
+            0, 1, 2,
+            2, 3, 0,
+        };
+
+        SDL_GPUBufferCreateInfo vertex_info = {};
+        vertex_info.size  = sizeof(vertices);
+        vertex_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+        gfx_state->_2d.vertex_buffer = SDL_CreateGPUBuffer(gfx_state->device, &vertex_info);
+
+        SDL_GPUBufferCreateInfo index_info = {};
+        index_info.size  = sizeof(indices);
+        index_info.usage = SDL_GPU_BUFFERUSAGE_INDEX;
+        gfx_state->_2d.index_buffer = SDL_CreateGPUBuffer(gfx_state->device, &index_info);
+
+        SDL_GPUTransferBufferCreateInfo transfer_info = {};
+        transfer_info.size   = vertex_info.size + index_info.size;
+        transfer_info.usage  = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+        auto transfer_buffer = SDL_CreateGPUTransferBuffer(gfx_state->device, &transfer_info);
+        defer (SDL_ReleaseGPUTransferBuffer(gfx_state->device, transfer_buffer));
+
+        auto transfer_map = (u8 *)SDL_MapGPUTransferBuffer(gfx_state->device, transfer_buffer, false);
+        isize transfer_offset = 0;
+        mem_copy(transfer_map + transfer_offset, vertices, vertex_info.size);
+        transfer_offset += vertex_info.size;
+        mem_copy(transfer_map + transfer_offset, indices, index_info.size);
+        transfer_offset += index_info.size;
+        SDL_UnmapGPUTransferBuffer(gfx_state->device, transfer_buffer);
+
+        auto command_buf = SDL_AcquireGPUCommandBuffer(gfx_state->device);
+        defer (SDL_SubmitGPUCommandBuffer(command_buf));
+
+        auto copy_pass = SDL_BeginGPUCopyPass(command_buf);
+        defer (SDL_EndGPUCopyPass(copy_pass));
+
+        isize upload_offset = 0;
+
+        /* Vertex buffer upload */ {
+            SDL_GPUTransferBufferLocation copy_src = {};
+            copy_src.transfer_buffer = transfer_buffer;
+            copy_src.offset = upload_offset;
+
+            SDL_GPUBufferRegion copy_dst = {};
+            copy_dst.buffer = gfx_state->_2d.vertex_buffer;
+            copy_dst.offset = 0;
+            copy_dst.size   = vertex_info.size;
+
+            SDL_UploadToGPUBuffer(copy_pass, &copy_src, &copy_dst, false);
+
+            upload_offset += copy_dst.size;
+        }
+
+
+        /* Index buffer upload */ {
+            SDL_GPUTransferBufferLocation copy_src = {};
+            copy_src.transfer_buffer = transfer_buffer;
+            copy_src.offset = upload_offset;
+
+            SDL_GPUBufferRegion copy_dst = {};
+            copy_dst.buffer = gfx_state->_2d.index_buffer;
+            copy_dst.offset = 0;
+            copy_dst.size   = index_info.size;
+
+            SDL_UploadToGPUBuffer(copy_pass, &copy_src, &copy_dst, false);
+
+            upload_offset += copy_dst.size;
+        }
+    }
+}
+
+void gfx_quit() {
+    SDL_ReleaseGPUBuffer(gfx_state->device, gfx_state->_2d.index_buffer);
+    SDL_ReleaseGPUBuffer(gfx_state->device, gfx_state->_2d.vertex_buffer);
+    SDL_ReleaseGPUGraphicsPipeline(gfx_state->device, gfx_state->_2d.pipeline);
+    SDL_ReleaseWindowFromGPUDevice(gfx_state->device, gfx_state->window);
+    SDL_DestroyGPUDevice(gfx_state->device);
+
+    allocator_free(gfx_state->allocator, gfx_state);
+}
+
+void gfx_draw(Gfx_Color clear_color) {
+    auto command_buf = SDL_AcquireGPUCommandBuffer(gfx_state->device);
+    defer (SDL_SubmitGPUCommandBuffer(command_buf));
+
+    SDL_GPUTexture *swapchain_tex;
+    SDL_WaitAndAcquireGPUSwapchainTexture(command_buf, gfx_state->window, &swapchain_tex, NULL, NULL);
+
+    if (!swapchain_tex) return;
+
+    SDL_FColor fcolor = {};
+    fcolor.r = clear_color.r / 255;
+    fcolor.g = clear_color.g / 255;
+    fcolor.b = clear_color.b / 255;
+    fcolor.a = clear_color.a / 255;
+
+    SDL_GPUColorTargetInfo color_info = {};
+    color_info.clear_color = fcolor;
+    color_info.load_op     = SDL_GPU_LOADOP_CLEAR;
+    color_info.store_op    = SDL_GPU_STOREOP_STORE;
+    color_info.texture     = swapchain_tex;
+
+    auto render_pass = SDL_BeginGPURenderPass(command_buf, &color_info, 1, NULL);
+    defer (SDL_EndGPURenderPass(render_pass));
+
+    SDL_BindGPUGraphicsPipeline(render_pass, gfx_state->_2d.pipeline);
+
+    SDL_GPUBufferBinding vertex_binding = {};
+    vertex_binding.buffer = gfx_state->_2d.vertex_buffer;
+    vertex_binding.offset = 0;
+    SDL_BindGPUVertexBuffers(render_pass, 0, &vertex_binding, 1);
+
+    SDL_GPUBufferBinding index_binding = {};
+    index_binding.buffer = gfx_state->_2d.index_buffer;
+    index_binding.offset = 0;
+    SDL_BindGPUIndexBuffer(render_pass, &index_binding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+
+    SDL_DrawGPUPrimitives(render_pass, 6, 1, 0, 0);
+}

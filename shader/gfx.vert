@@ -1,18 +1,13 @@
-#version 460
+#version 460 core
 
-layout(set = 1, binding = 0) uniform Uniform_Buffer {
-    mat4 proj;
-};
+layout(location = 0) in vec2 in_position;
+layout(location = 1) in vec2 in_texcoord;
+layout(location = 2) in vec4 in_color;
+
+layout(location = 0) out vec4 out_color;
+layout(location = 1) out vec2 out_texcoord;
 
 void main() {
-    vec4 pos;
-
-    if (gl_VertexIndex == 0) {
-        gl_Position = vec4(-0.5, -0.5, 0, 1);
-    } else if (gl_VertexIndex == 1) {
-        gl_Position = vec4(0, 0.5, 0, 1);
-    } else if (gl_VertexIndex == 2) {
-        gl_Position = vec4(0.5, -0.5, 0, 1);
-    }
-    gl_Position = proj * pos;
+    gl_Position = vec4(in_position, 0.0, 1.0);
+    out_color = in_color;
 }
