@@ -75,7 +75,7 @@ static SDL_GPUShader *gfx_load_shader(const String &file) {
         }
     }
 
-    isize code_size;
+    usize code_size;
     void *code = SDL_LoadFile(string_to_cstr(arena_allocator(s.arena), file), (size_t *)&code_size);
     if (!code) return NULL;
     defer (SDL_free(code));
@@ -91,53 +91,43 @@ static SDL_GPUShader *gfx_load_shader(const String &file) {
     info.num_storage_buffers  = num_storage_buf;
     info.num_uniform_buffers  = num_uniform_buf;
 
-    return SDL_CreateGPUShader(gfx_state->device, &info);
+    return SDL_CreateGPUShader(gfx->device, &info);
 }
 
-void gfx_init(const Allocator &a, SDL_Window *window) {
-    gfx_state = alloc_struct(a, Gfx_State);
-
-    mem_zero_ptr(gfx_state);
-
-    gfx_state->window = window;
-    gfx_state->device = SDL_CreateGPUDevice(GFX_SHADER_FORMAT, true, NULL);
-
-    ASSERT(SDL_ClaimWindowForGPUDevice(gfx_state->device, gfx_state->window));
-
-    auto vert_shader = gfx_load_shader(LIT("shader/gfx.vert.spv"));
-    defer (SDL_ReleaseGPUShader(gfx_state->device, vert_shader));
-
-    auto frag_shader = gfx_load_shader(LIT("shader/gfx.frag.spv"));
-    defer (SDL_ReleaseGPUShader(gfx_state->device, frag_shader));
+static void gfx_init_quad_batch(void) {
+    auto *batch = &gfx->quad_batch;
 
     /* Create pipeline */ {
+        auto *vert_shader = gfx_load_shader(LIT("shader/quad.vert.1u.spv"));
+        defer (SDL_ReleaseGPUShader(gfx->device, vert_shader));
+
+        auto *frag_shader = gfx_load_shader(LIT("shader/quad.frag.1s.spv"));
+        defer (SDL_ReleaseGPUShader(gfx->device, frag_shader));
+
         const i32 NUM_VERTEX_ATTRIBUTES = 3;
-        SDL_GPUVertexAttribute vert_attributes[NUM_VERTEX_ATTRIBUTES];
-        mem_zero_array(vert_attributes);
+        SDL_GPUVertexAttribute vert_attributes[NUM_VERTEX_ATTRIBUTES] = {};
         vert_attributes[0].location    = 0;
         vert_attributes[0].buffer_slot = 0;
         vert_attributes[0].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
-        vert_attributes[0].offset      = offsetof(Gfx_Vertex2D, position);
+        vert_attributes[0].offset      = offsetof(Gfx_Quad_Vertex, position);
         vert_attributes[1].location    = 1;
         vert_attributes[1].buffer_slot = 0;
         vert_attributes[1].format      = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
-        vert_attributes[1].offset      = offsetof(Gfx_Vertex2D, texcoord);
+        vert_attributes[1].offset      = offsetof(Gfx_Quad_Vertex, texcoord);
         vert_attributes[2].location    = 2;
         vert_attributes[2].buffer_slot = 0;
         vert_attributes[2].format      = SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM;
-        vert_attributes[2].offset      = offsetof(Gfx_Vertex2D, color);
+        vert_attributes[2].offset      = offsetof(Gfx_Quad_Vertex, color);
 
         const i32 NUM_VERTEX_BUFFERS = 1;
-        SDL_GPUVertexBufferDescription vert_descriptions[NUM_VERTEX_BUFFERS];
-        mem_zero_array(vert_descriptions);
+        SDL_GPUVertexBufferDescription vert_descriptions[NUM_VERTEX_BUFFERS] = {};
         vert_descriptions[0].slot  = 0;
-        vert_descriptions[0].pitch = sizeof(Gfx_Vertex2D);
+        vert_descriptions[0].pitch = sizeof(Gfx_Quad_Vertex);
         vert_descriptions[0].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
 
         const i32 NUM_TARGET_COLORS = 1;
-        SDL_GPUColorTargetDescription target_colors[NUM_TARGET_COLORS];
-        mem_zero_array(target_colors);
-        target_colors[0].format = SDL_GetGPUSwapchainTextureFormat(gfx_state->device, gfx_state->window);
+        SDL_GPUColorTargetDescription target_colors[NUM_TARGET_COLORS] = {};
+        target_colors[0].format = SDL_GetGPUSwapchainTextureFormat(gfx->device, gfx->window);
         target_colors[0].blend_state.enable_blend          = true;
         target_colors[0].blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
         target_colors[0].blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
@@ -161,111 +151,149 @@ void gfx_init(const Allocator &a, SDL_Window *window) {
         pipe_info.target_info.color_target_descriptions         = target_colors;
         pipe_info.target_info.num_color_targets                 = NUM_TARGET_COLORS;
 
-        gfx_state->_2d.pipeline = SDL_CreateGPUGraphicsPipeline(gfx_state->device, &pipe_info);
+        batch->pipeline = SDL_CreateGPUGraphicsPipeline(gfx->device, &pipe_info);
     }
 
     /* Create buffers */ {
-        const Gfx_Vertex2D vertices[] = {
-            { vec2_make(-0.5f, -0.5f), vec2_make(0.0f, 1.0f), GFX_WHITE }, // Bottom-left
-            { vec2_make( 0.5f, -0.5f), vec2_make(1.0f, 1.0f), GFX_WHITE }, // Bottom-right
-            { vec2_make( 0.5f,  0.5f), vec2_make(1.0f, 0.0f), GFX_WHITE }, // Top-right
-            { vec2_make(-0.5f,  0.5f), vec2_make(0.0f, 0.0f), GFX_WHITE }, // Top-left
-        };
-
-        const u16 indices[] = {
-            0, 1, 2,
-            2, 3, 0,
-        };
+        u32 offset = 0;
 
         SDL_GPUBufferCreateInfo vertex_info = {};
-        vertex_info.size  = sizeof(vertices);
+        vertex_info.size  = GFX_NUM_VERTICES_PER_QUAD * GFX_MAX_QUADS_PER_BATCH * sizeof(Gfx_Quad_Vertex);
         vertex_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
-        gfx_state->_2d.vertex_buffer = SDL_CreateGPUBuffer(gfx_state->device, &vertex_info);
+        batch->vertex_region.buffer = SDL_CreateGPUBuffer(gfx->device, &vertex_info);
+        batch->vertex_region.size   = vertex_info.size;
+        batch->vertex_region.offset = offset;
+
+        offset += vertex_info.size;
 
         SDL_GPUBufferCreateInfo index_info = {};
-        index_info.size  = sizeof(indices);
+        index_info.size  = GFX_NUM_INDICES_PER_QUAD * GFX_MAX_QUADS_PER_BATCH * sizeof(Gfx_Index);
         index_info.usage = SDL_GPU_BUFFERUSAGE_INDEX;
-        gfx_state->_2d.index_buffer = SDL_CreateGPUBuffer(gfx_state->device, &index_info);
+        batch->index_region.buffer = SDL_CreateGPUBuffer(gfx->device, &index_info);
+        batch->index_region.size   = index_info.size;
+        batch->index_region.offset = offset;
 
-        SDL_GPUTransferBufferCreateInfo transfer_info = {};
-        transfer_info.size   = vertex_info.size + index_info.size;
-        transfer_info.usage  = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-        auto transfer_buffer = SDL_CreateGPUTransferBuffer(gfx_state->device, &transfer_info);
-        defer (SDL_ReleaseGPUTransferBuffer(gfx_state->device, transfer_buffer));
+        offset += index_info.size;
 
-        auto transfer_map = (u8 *)SDL_MapGPUTransferBuffer(gfx_state->device, transfer_buffer, false);
-        isize transfer_offset = 0;
-        mem_copy(transfer_map + transfer_offset, vertices, vertex_info.size);
-        transfer_offset += vertex_info.size;
-        mem_copy(transfer_map + transfer_offset, indices, index_info.size);
-        transfer_offset += index_info.size;
-        SDL_UnmapGPUTransferBuffer(gfx_state->device, transfer_buffer);
+        SDL_GPUTransferBufferCreateInfo upload_info = {};
+        upload_info.size  = offset;
+        upload_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+        batch->upload_buffer = SDL_CreateGPUTransferBuffer(gfx->device, &upload_info);
+    }
 
-        auto command_buf = SDL_AcquireGPUCommandBuffer(gfx_state->device);
+    /* Create white texture */ {
+        u32 white = 0xffffffff; // 1x1 RGBA
+
+        SDL_GPUTransferBufferCreateInfo upload_info = {};
+        upload_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+        upload_info.size  = sizeof(white);
+
+        auto *upload_buf = SDL_CreateGPUTransferBuffer(gfx->device, &upload_info);
+        defer (SDL_ReleaseGPUTransferBuffer(gfx->device, upload_buf));
+
+        auto *upload_ptr = (u32 *)SDL_MapGPUTransferBuffer(gfx->device, upload_buf, false);
+        mem_copy(upload_ptr, &white, sizeof(white));
+        SDL_UnmapGPUTransferBuffer(gfx->device, upload_buf);
+
+        SDL_GPUTextureCreateInfo tex_info = {};
+        tex_info.type       = SDL_GPU_TEXTURETYPE_2D;
+        tex_info.format     = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+        tex_info.width      = 1;
+        tex_info.height     = 1;
+        tex_info.num_levels = 1;
+        tex_info.usage      = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+        tex_info.layer_count_or_depth = 1;
+
+        batch->white_texture = SDL_CreateGPUTexture(gfx->device, &tex_info);
+
+        SDL_GPUSamplerCreateInfo sampler_info = {};
+        sampler_info.min_filter = SDL_GPU_FILTER_LINEAR;
+        sampler_info.mag_filter = SDL_GPU_FILTER_LINEAR;
+
+        batch->white_sampler = SDL_CreateGPUSampler(gfx->device, &sampler_info);
+
+        auto *command_buf = SDL_AcquireGPUCommandBuffer(gfx->device);
         defer (SDL_SubmitGPUCommandBuffer(command_buf));
 
-        auto copy_pass = SDL_BeginGPUCopyPass(command_buf);
+        auto *copy_pass = SDL_BeginGPUCopyPass(command_buf);
         defer (SDL_EndGPUCopyPass(copy_pass));
 
-        isize upload_offset = 0;
+        SDL_GPUTextureTransferInfo transfer_info = {};
+        transfer_info.transfer_buffer = upload_buf;
+        transfer_info.offset = 0;
 
-        /* Vertex buffer upload */ {
-            SDL_GPUTransferBufferLocation copy_src = {};
-            copy_src.transfer_buffer = transfer_buffer;
-            copy_src.offset = upload_offset;
+        SDL_GPUTextureRegion transfer_region = {};
+        transfer_region.texture = batch->white_texture;
+        transfer_region.w = 1;
+        transfer_region.h = 1;
+        transfer_region.d = 1;
 
-            SDL_GPUBufferRegion copy_dst = {};
-            copy_dst.buffer = gfx_state->_2d.vertex_buffer;
-            copy_dst.offset = 0;
-            copy_dst.size   = vertex_info.size;
-
-            SDL_UploadToGPUBuffer(copy_pass, &copy_src, &copy_dst, false);
-
-            upload_offset += copy_dst.size;
-        }
-
-
-        /* Index buffer upload */ {
-            SDL_GPUTransferBufferLocation copy_src = {};
-            copy_src.transfer_buffer = transfer_buffer;
-            copy_src.offset = upload_offset;
-
-            SDL_GPUBufferRegion copy_dst = {};
-            copy_dst.buffer = gfx_state->_2d.index_buffer;
-            copy_dst.offset = 0;
-            copy_dst.size   = index_info.size;
-
-            SDL_UploadToGPUBuffer(copy_pass, &copy_src, &copy_dst, false);
-
-            upload_offset += copy_dst.size;
-        }
+        SDL_UploadToGPUTexture(copy_pass, &transfer_info, &transfer_region, false);
     }
 }
 
-void gfx_quit() {
-    SDL_ReleaseGPUBuffer(gfx_state->device, gfx_state->_2d.index_buffer);
-    SDL_ReleaseGPUBuffer(gfx_state->device, gfx_state->_2d.vertex_buffer);
-    SDL_ReleaseGPUGraphicsPipeline(gfx_state->device, gfx_state->_2d.pipeline);
-    SDL_ReleaseWindowFromGPUDevice(gfx_state->device, gfx_state->window);
-    SDL_DestroyGPUDevice(gfx_state->device);
+static void gfx_free_quad_batch() {
+    auto *batch = &gfx->quad_batch;
 
-    allocator_free(gfx_state->allocator, gfx_state);
+    SDL_ReleaseGPUSampler(gfx->device, batch->white_sampler);
+    SDL_ReleaseGPUTexture(gfx->device, batch->white_texture);
+    SDL_ReleaseGPUTransferBuffer(gfx->device, batch->upload_buffer);
+    SDL_ReleaseGPUBuffer(gfx->device, batch->index_region.buffer);
+    SDL_ReleaseGPUBuffer(gfx->device, batch->vertex_region.buffer);
+    SDL_ReleaseGPUGraphicsPipeline(gfx->device, batch->pipeline);
+
+    mem_zero_ptr(batch);
 }
 
-void gfx_draw(Gfx_Color clear_color) {
-    auto command_buf = SDL_AcquireGPUCommandBuffer(gfx_state->device);
+static void gfx_render_quad_batch(void) {
+    auto *command_buf = SDL_AcquireGPUCommandBuffer(gfx->device);
     defer (SDL_SubmitGPUCommandBuffer(command_buf));
 
     SDL_GPUTexture *swapchain_tex;
-    SDL_WaitAndAcquireGPUSwapchainTexture(command_buf, gfx_state->window, &swapchain_tex, NULL, NULL);
-
+    u32 swapchain_width, swapchain_height;
+    SDL_WaitAndAcquireGPUSwapchainTexture(command_buf, gfx->window, &swapchain_tex, &swapchain_width, &swapchain_height);
     if (!swapchain_tex) return;
 
+    Mat4 proj = mat4_ortho(0.0f, swapchain_width, swapchain_height, 0.0f, -1.0f, 1.0f);
+
+    /* Upload */ {
+        auto *batch = &gfx->quad_batch;
+
+        SDL_PushGPUVertexUniformData(command_buf, 0, &proj, sizeof(Mat4));
+
+        auto *copy_pass = SDL_BeginGPUCopyPass(command_buf);
+        defer (SDL_EndGPUCopyPass(copy_pass));
+
+        {
+            SDL_GPUTransferBufferLocation copy_src = {};
+            copy_src.transfer_buffer = batch->upload_buffer;
+            copy_src.offset = batch->vertex_region.offset;
+
+            SDL_GPUBufferRegion copy_dst = {};
+            copy_dst.buffer = batch->vertex_region.buffer;
+            copy_dst.size   = batch->vertex_region.size;
+
+            SDL_UploadToGPUBuffer(copy_pass, &copy_src, &copy_dst, false);
+        }
+
+        {
+            SDL_GPUTransferBufferLocation copy_src = {};
+            copy_src.transfer_buffer = batch->upload_buffer;
+            copy_src.offset = batch->index_region.offset;
+
+            SDL_GPUBufferRegion copy_dst = {};
+            copy_dst.buffer = batch->index_region.buffer;
+            copy_dst.size   = batch->index_region.size;
+
+            SDL_UploadToGPUBuffer(copy_pass, &copy_src, &copy_dst, false);
+        }
+    }
+
     SDL_FColor fcolor = {};
-    fcolor.r = clear_color.r / 255;
-    fcolor.g = clear_color.g / 255;
-    fcolor.b = clear_color.b / 255;
-    fcolor.a = clear_color.a / 255;
+    fcolor.r = gfx->clear_color.r / 255;
+    fcolor.g = gfx->clear_color.g / 255;
+    fcolor.b = gfx->clear_color.b / 255;
+    fcolor.a = gfx->clear_color.a / 255;
 
     SDL_GPUColorTargetInfo color_info = {};
     color_info.clear_color = fcolor;
@@ -273,20 +301,153 @@ void gfx_draw(Gfx_Color clear_color) {
     color_info.store_op    = SDL_GPU_STOREOP_STORE;
     color_info.texture     = swapchain_tex;
 
-    auto render_pass = SDL_BeginGPURenderPass(command_buf, &color_info, 1, NULL);
-    defer (SDL_EndGPURenderPass(render_pass));
+    /* Render */ {
+        auto *batch = &gfx->quad_batch;
 
-    SDL_BindGPUGraphicsPipeline(render_pass, gfx_state->_2d.pipeline);
+        auto *render_pass = SDL_BeginGPURenderPass(command_buf, &color_info, 1, NULL);
+        defer (SDL_EndGPURenderPass(render_pass));
 
-    SDL_GPUBufferBinding vertex_binding = {};
-    vertex_binding.buffer = gfx_state->_2d.vertex_buffer;
-    vertex_binding.offset = 0;
-    SDL_BindGPUVertexBuffers(render_pass, 0, &vertex_binding, 1);
+        SDL_BindGPUGraphicsPipeline(render_pass, batch->pipeline);
 
-    SDL_GPUBufferBinding index_binding = {};
-    index_binding.buffer = gfx_state->_2d.index_buffer;
-    index_binding.offset = 0;
-    SDL_BindGPUIndexBuffer(render_pass, &index_binding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+        {
+            const i32 num_bindings = 1;
+            SDL_GPUBufferBinding bindings[num_bindings] = {};
 
-    SDL_DrawGPUPrimitives(render_pass, 6, 1, 0, 0);
+            bindings[0].buffer = batch->vertex_region.buffer;
+            bindings[0].offset = 0;
+
+            SDL_BindGPUVertexBuffers(render_pass, 0, bindings, num_bindings);
+        }
+
+        {
+            const i32 num_bindings = 1;
+            SDL_GPUBufferBinding bindings[num_bindings] = {};
+
+            bindings[0].buffer = batch->index_region.buffer;
+            bindings[0].offset = 0;
+
+            SDL_BindGPUIndexBuffer(render_pass, bindings, GFX_INDEX_ELEMENT_SIZE);
+        }
+
+        {
+            const i32 num_bindings = 1;
+            SDL_GPUTextureSamplerBinding bindings[num_bindings] = {};
+
+            bindings[0].texture = batch->white_texture;
+            bindings[0].sampler = batch->white_sampler;
+
+            SDL_BindGPUFragmentSamplers(render_pass, 0, bindings, num_bindings);
+        }
+
+        u32 num_current_indices = GFX_NUM_INDICES_PER_QUAD * batch->push_count;
+        u32 num_draw_indices    = CLAMP(num_current_indices, 0, GFX_MAX_QUAD_INDICES_PER_BATCH);
+        SDL_DrawGPUIndexedPrimitives(render_pass, num_draw_indices, 1, 0, 0, 0);
+    }
+}
+
+static void gfx_flush_quad_batch(void) {
+    auto *batch = &gfx->quad_batch;
+
+    ASSERT(0 < batch->push_count && batch->push_count <= GFX_MAX_QUADS_PER_BATCH);
+
+    gfx_render_quad_batch();
+
+    batch->push_count = 0;
+}
+
+void gfx_init(const Allocator &a, SDL_Window *window) {
+    gfx = alloc_struct(a, Gfx_State);
+
+    mem_zero_ptr(gfx);
+
+    gfx->allocator = a;
+    gfx->window = window;
+    gfx->device = SDL_CreateGPUDevice(GFX_SHADER_FORMAT, true, NULL);
+
+    ASSERT(SDL_ClaimWindowForGPUDevice(gfx->device, gfx->window));
+
+    #if 1
+    SDL_SetGPUSwapchainParameters(gfx->device, gfx->window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, SDL_GPU_PRESENTMODE_IMMEDIATE);
+    #endif
+
+    gfx_init_quad_batch();
+}
+
+void gfx_quit(void) {
+    gfx_free_quad_batch();
+
+    SDL_ReleaseWindowFromGPUDevice(gfx->device, gfx->window);
+    SDL_DestroyGPUDevice(gfx->device);
+
+    allocator_free(gfx->allocator, gfx);
+}
+
+void gfx_set_clear_color(Gfx_Color color) {
+    gfx->clear_color = color;
+}
+
+void gfx_begin_drawing(void) {
+    ASSERT(!gfx->drawing);
+
+    gfx->drawing = true;
+    gfx->quad_batch.upload_ptr = (u8 *)SDL_MapGPUTransferBuffer(gfx->device, gfx->quad_batch.upload_buffer, false);
+}
+
+void gfx_end_drawing(void) {
+    ASSERT(gfx->drawing);
+
+    gfx_flush_quad_batch();
+
+    SDL_UnmapGPUTransferBuffer(gfx->device, gfx->quad_batch.upload_buffer);
+    gfx->drawing = false;
+}
+
+void gfx_draw_rectangle(f32 x, f32 y, f32 w, f32 h, Gfx_Color color) {
+    auto *batch = &gfx->quad_batch;
+
+    if (batch->push_count >= GFX_MAX_QUADS_PER_BATCH) {
+        gfx_flush_quad_batch();
+    }
+
+    u32 vertex_count = GFX_NUM_VERTICES_PER_QUAD * batch->push_count;
+    u32 index_count  = GFX_NUM_INDICES_PER_QUAD  * batch->push_count;
+    u16 index_base   = (u16)vertex_count;
+
+    auto *vertices = (Gfx_Quad_Vertex *)(batch->upload_ptr + batch->vertex_region.offset);
+
+    vertices[vertex_count++] = {
+        vec2_make(x, y),        // position
+        vec2_make(0.0f, 1.0f),  // texcoord
+        color,                  // color
+    };
+
+    vertices[vertex_count++] = {
+        vec2_make(x + w, y),    // position
+        vec2_make(1.0f, 1.0f),  // texcoord
+        color,                  // color
+    };
+
+    vertices[vertex_count++] = {
+        vec2_make(x + w, y + h), // position
+        vec2_make(1.0f, 0.0f),   // texcoord
+        color,                   // color
+    };
+
+    vertices[vertex_count++] = {
+        vec2_make(x, y + h),     // position
+        vec2_make(0.0f, 0.0f),   // texcoord
+        color,                   // color
+    };
+
+    auto *indices = (Gfx_Index *)(batch->upload_ptr + batch->index_region.offset);
+
+    indices[index_count++] = index_base + 0;
+    indices[index_count++] = index_base + 1;
+    indices[index_count++] = index_base + 2;
+
+    indices[index_count++] = index_base + 2;
+    indices[index_count++] = index_base + 3;
+    indices[index_count++] = index_base + 0;
+
+    batch->push_count += 1;
 }

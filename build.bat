@@ -37,7 +37,7 @@ copy SDL\lib\x64\SDL3.dll SDL3.dll >nul 2>&1
 
 if exist test_base.exe       del test_base.exe
 if exist test_linalg.exe     del test_linalg.exe
-if exist sample_triangle.exe del sample_triangle.exe
+if exist sample_quad.exe del sample_quad.exe
 
 set cl_test_base=call cl /Zc:__cplusplus %cflags% test\test_base.cpp base.cpp /nologo
 echo Command: %cl_test_base%
@@ -49,13 +49,13 @@ echo Command: %cl_test_linalg%
 %cl_test_linalg%
 if errorlevel 1 exit /b 1
 
-set cl_sample_triangle=call cl /Zc:__cplusplus %cflags% %include_dirs% test\sample_triangle.cpp base.cpp linalg.cpp gfx.cpp /link %lflags% %lib_dirs% %lib_files% /nologo
-echo Command: %cl_sample_triangle%
-%cl_sample_triangle%
+set cl_sample_quad=call cl /Zc:__cplusplus %cflags% %include_dirs% test\sample_quad.cpp base.cpp linalg.cpp gfx.cpp /link %lflags% %lib_dirs% %lib_files% /nologo
+echo Command: %cl_sample_quad%
+%cl_sample_quad%
 if errorlevel 1 exit /b 1
 
 call test_base.exe
 call test_linalg.exe
-call sample_triangle.exe
+call sample_quad.exe
 
 @endlocal

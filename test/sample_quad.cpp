@@ -31,6 +31,11 @@ int main(void) {
     gfx_init(heap_allocator(), window);
     defer (gfx_quit());
 
+    u32 frame_per_seconds = 0;
+
+    u64 last_time = 0;
+    u64 current_time;
+
     bool keep_running = true;
     SDL_Event event;
     while (keep_running) {
@@ -40,7 +45,23 @@ int main(void) {
             }
         }
 
-        gfx_draw(GFX_BLACK);
+        gfx_begin_drawing();
+
+        for_count(i, GFX_MAX_QUADS_PER_BATCH) {
+            gfx_draw_rectangle(0, 0, 10, 10, GFX_RED);
+        }
+
+        gfx_end_drawing();
+
+        frame_per_seconds += 1;
+
+        current_time = SDL_GetTicks();
+        if (current_time > last_time + 1000) {
+            last_time = current_time;
+
+            printf("FPS: %llu\n", frame_per_seconds);
+            frame_per_seconds = 0;
+        }
     }
 
     return 0;

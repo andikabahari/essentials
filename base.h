@@ -1,5 +1,5 @@
 //
-// kbase.h
+// base.h
 //
 // This is a public domain C/C++ library.
 // No warranty implied, use at your own risk!
